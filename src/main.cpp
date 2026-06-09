@@ -3,23 +3,14 @@
 #include <netinet/in.h>//sockaddr_in(ip and port number)
 #include <unistd.h>//close()
 #include <cstring>
+#include <sys/epoll.h>
 #include<thread>
+#include <cerrno>
+#include <fcntl.h>
 
 using namespace std;
 
-void handleClient(int client_fd){
 
-    char buffer[1024]{};
-
-    int bytes_received = recv(client_fd , buffer , sizeof(buffer),0);
-
-    if(bytes_received >0){
-       cout<<"Received:"<<buffer<<endl;
-
-       send(client_fd , buffer , bytes_received ,0);
-    }
-    close(client_fd);
-}
 
 int main()
 {
@@ -50,20 +41,49 @@ int main()
     }
 
     cout<<"Waiting for client"<<endl;
+    int epoll_fd = epoll_create1(0);
 
-    while(true){
-    int client_fd = accept(server_fd , nullptr , nullptr);
-
-    if(client_fd ==-1){
-      cout<<"Client connection is failed!"<<endl;
-      continue;
+    if(epoll_fd ==-1){
+      cout<<"epoll creation failed!";
+      return 1;
     }
 
-    thread t(handleClient ,client_fd);
-    t.detach();
 
+    epoll_event ev{};
+     ev.events = EPOLLIN;
+     ev.data.fd = server_fd;
+
+    if(epoll_ctl(epoll_fd,EPOLL_CTL_ADD,server_fd,&ev) == -1){
+    cout<<"epoll_ctl failed"<<endl;
+    return 1;
+     }
+
+     epoll_event events[10];
+
+    while( true){
+      int num_events = epoll_wait( epoll_fd , events ,10 ,-1);
+
+      if(num_events ==-1){
+        cout<<"epoll_wait failed!"<<endl;
+      }
+
+    for(int i = 0; i < num_events; i++){
+
+         if(events[i].data.fd == server_fd){
+            cout<<"New Client Arrived"<<endl;
+            int client_fd =accept(server_fd,nullptr,nullptr);
+            if(client_fd == -1){
+             cout<<"Accepted Failed! "<<endl;
+             continue;
+        }
+
+         cout<<"Accepted client FD:"<<client_fd<<endl;
+         close(client_fd);
     }
+ }
+}
 
+    close(epoll_fd);
     close(server_fd);
     return 0;
 }

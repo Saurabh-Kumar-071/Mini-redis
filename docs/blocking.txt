@@ -1,0 +1,48 @@
+blocking --> The thread is waiting for an operation to finish. While waiting, it cannot do other work.
+
+   ||
+   \/
+ polling  -> while(true)  Server asks everyone: "Any data?"
+{
+    check client A
+    check client B
+    check client C
+    ...
+    check client 10000
+}
+
+  ||
+  \/
+  epoll ->OS notifies server: "These clients are ready."
+   (architecture)
+        Clients
+          │
+          ▼
+        epoll
+          │
+          ▼
+     Ready Client List
+          │
+          ▼
+   Server Processes Only Ready Clients
+
+
+
+******************* problem from initial to final *****************
+Blocking recv()
+      ↓
+Problem understood
+
+Thread per client
+      ↓
+Problem understood
+
+Non-blocking polling
+      ↓
+Problem understood
+
+epoll
+      ↓
+Solution makes sense
+
+***********************************************************************************

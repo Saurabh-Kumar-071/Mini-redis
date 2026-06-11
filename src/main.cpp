@@ -7,13 +7,15 @@
 #include<thread>
 #include <cerrno>
 #include <fcntl.h>
+#include "database/Database.h"
+#include <sstream>
 
 using namespace std;
 
-
-
 int main()
 {
+   Database db;
+
     int server_fd = socket(AF_INET, SOCK_STREAM, 0);
 
     if(server_fd== -1){
@@ -29,7 +31,7 @@ int main()
     server_addr.sin_addr.s_addr=INADDR_ANY;
 
     if(bind(server_fd , (sockaddr*)&server_addr , sizeof(server_addr)) < 0){
-      cout<<"Bind connection is failed!"<<endl;
+      cout<<"Bind connection is failed!"<<strerror(errno)<<endl;
       close(server_fd);
       return 1;
     }
@@ -76,9 +78,72 @@ int main()
              cout<<"Accepted Failed! "<<endl;
              continue;
         }
+        epoll_event client_event{};
+
+        client_event.events = EPOLLIN;
+        client_event.data.fd = client_fd;
+
+       if(epoll_ctl(epoll_fd,EPOLL_CTL_ADD,client_fd,&client_event)==-1){
+        cout<<"Client Regestire unsuccessfull with epoll"<<endl;
+       }
 
          cout<<"Accepted client FD:"<<client_fd<<endl;
-         close(client_fd);
+
+    }else{
+       char buffer[1024];
+       int bytes_received = recv(events[i].data.fd , buffer , sizeof(buffer) ,0);
+
+       if(bytes_received > 0){
+        cout<<"bytes_received:"<<bytes_received<<endl;
+        cout.write(buffer , bytes_received);
+
+        string command(buffer, bytes_received);
+        stringstream ss(command);
+        string action;
+        ss>>action;
+
+        if(action =="PING"){
+           string response ="PONG";
+
+           send(events[i].data.fd , response.c_str() , response.size() ,0);
+        }
+        else if(action == "SET") {
+
+          string key;
+          string value;
+          ss>>key>>value;
+          db.set(key , value);
+          string response ="ok\n";
+             send(events[i].data.fd , response.c_str() , response.size() ,0);
+        }
+        else if( action =="GET"){
+          string key;
+          ss>>key;
+          string response = db.get(key);
+          send(events[i].data.fd , response.c_str() , response.size() , 0);
+        }
+        else if(action =="DEL"){
+          string key;
+          ss>>key;
+          db.del(key);
+          string response = "Delete successfully from database!";
+          send(events[i].data.fd , response.c_str() , response.size() ,0);
+        }
+        else{
+          send(events[i].data.fd , buffer , bytes_received ,0);
+        }
+       }
+
+       else if (bytes_received ==0){
+        cout<<"Client disconnect"<<endl;
+         epoll_ctl( epoll_fd,EPOLL_CTL_DEL,events[i].data.fd,nullptr);
+         close(events[i].data.fd);
+       }
+
+       else{
+        cout<<"Error"<<errno<<endl;
+       }
+
     }
  }
 }

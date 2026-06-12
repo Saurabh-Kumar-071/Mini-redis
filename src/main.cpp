@@ -9,13 +9,15 @@
 #include <fcntl.h>
 #include "database/Database.h"
 #include <sstream>
-
+#include "command/CommandParser.h"
+#include "command/CommandExecutor.h"
 using namespace std;
 
 int main()
 {
    Database db;
-
+   CommandParser parser;
+   CommandExecutor executor(db);
     int server_fd = socket(AF_INET, SOCK_STREAM, 0);
 
     if(server_fd== -1){
@@ -97,41 +99,14 @@ int main()
         cout<<"bytes_received:"<<bytes_received<<endl;
         cout.write(buffer , bytes_received);
 
-        string command(buffer, bytes_received);
-        stringstream ss(command);
-        string action;
-        ss>>action;
+         string str(buffer, bytes_received);
 
-        if(action =="PING"){
-           string response ="PONG";
+         ParsedCommand cmd = parser.parse(str);
+        if(cmd.command.empty()) continue;
 
-           send(events[i].data.fd , response.c_str() , response.size() ,0);
-        }
-        else if(action == "SET") {
+         string response = executor.execute(cmd);
+         send(events[i].data.fd , response.c_str(), response.size() ,0);
 
-          string key;
-          string value;
-          ss>>key>>value;
-          db.set(key , value);
-          string response ="ok\n";
-             send(events[i].data.fd , response.c_str() , response.size() ,0);
-        }
-        else if( action =="GET"){
-          string key;
-          ss>>key;
-          string response = db.get(key);
-          send(events[i].data.fd , response.c_str() , response.size() , 0);
-        }
-        else if(action =="DEL"){
-          string key;
-          ss>>key;
-          db.del(key);
-          string response = "Delete successfully from database!";
-          send(events[i].data.fd , response.c_str() , response.size() ,0);
-        }
-        else{
-          send(events[i].data.fd , buffer , bytes_received ,0);
-        }
        }
 
        else if (bytes_received ==0){

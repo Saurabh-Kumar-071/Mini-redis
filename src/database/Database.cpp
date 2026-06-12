@@ -15,6 +15,6 @@ string Database :: get( const string&key) {
 }
 
 void Database ::del(const  string &key){
-
+    
    data.erase(key);
 }

@@ -10,6 +10,7 @@ add_executable(
     src/server/Server.cpp
     src/database/Database.cpp
     src/command/CommandParser.cpp
+    src/command/CommandExecutor.cpp
     src/utils/Split.cpp
 )
 

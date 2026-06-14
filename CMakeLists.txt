@@ -11,6 +11,8 @@ add_executable(
     src/database/Database.cpp
     src/command/CommandParser.cpp
     src/command/CommandExecutor.cpp
+    src/client/ClientConnection.cpp
+    src/client/ClientManager.cpp
     src/utils/Split.cpp
 )
 

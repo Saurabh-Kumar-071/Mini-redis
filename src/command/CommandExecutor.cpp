@@ -2,7 +2,7 @@
 #include "CommandExecutor.h"
 using namespace std;
 
-CommandExecutor::CommandExecutor( Database& database): db(database){ // ?
+CommandExecutor::CommandExecutor( Database& database): db(database){ // constructor initializer list.
 
 }
 

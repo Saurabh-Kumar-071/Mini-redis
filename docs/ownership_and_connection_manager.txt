@@ -1,0 +1,398 @@
+====================================================
+MINI REDIS LEARNING JOURNAL
+TOPIC: OWNERSHIP, RAII & CONNECTION MANAGER
+====================================================
+
+1. OWNERSHIP
+
+Definition:
+Ownership means deciding who is responsible for
+destroying and cleaning up a resource.
+
+Examples of resources:
+- Memory
+- Socket fd
+- File
+- Thread
+- Database Connection
+
+Rule:
+Every resource should have one clear owner.
+
+----------------------------------------------------
+
+2. PROBLEM WITHOUT OWNERSHIP
+
+Example:
+
+int* p1 = new int(5);
+int* p2 = p1;
+
+Now both pointers point to the same memory.
+
+Problems:
+- Double Delete
+- Memory Leak
+- Dangling Pointer
+
+Reason:
+Ownership is unclear.
+
+----------------------------------------------------
+
+3. UNIQUE_PTR
+
+Purpose:
+Represents a single owner.
+
+Example:
+
+auto p = std::make_unique<int>(5);
+
+Properties:
+- One owner only
+- Cannot be copied
+- Can be moved
+- Automatic cleanup
+
+----------------------------------------------------
+
+4. RAII
+
+Full Form:
+Resource Acquisition Is Initialization
+
+Idea:
+Acquire resource in constructor.
+Release resource in destructor.
+
+Example:
+
+ClientConnection::~ClientConnection()
+{
+    close(fd);
+}
+
+Result:
+
+Object Destroyed
+        ↓
+Destructor Runs
+        ↓
+Socket Automatically Closed
+
+Benefits:
+- Prevents leaks
+- Automatic cleanup
+- Safer code
+
+----------------------------------------------------
+
+5. CLIENT CONNECTION CLASS
+
+Purpose:
+Represents one connected client.
+
+Stores:
+
+class ClientConnection
+{
+private:
+    int fd;
+    std::string readBuffer;
+    std::string writeBuffer;
+};
+
+Responsibilities:
+- Own socket fd
+- Store incoming data
+- Store outgoing data
+- Close socket automatically
+
+----------------------------------------------------
+
+6. CONNECTION MANAGER
+
+Purpose:
+Store and manage all connected clients.
+
+Data Structure:
+
+std::unordered_map<
+    int,
+    std::unique_ptr<ClientConnection>
+> clients;
+
+----------------------------------------------------
+
+7. MEANING OF THE MAP
+
+Key:
+int
+
+Represents:
+Client file descriptor (fd)
+
+Value:
+std::unique_ptr<ClientConnection>
+
+Represents:
+Client object
+
+Example:
+
+5 -> ClientConnection(fd=5)
+
+6 -> ClientConnection(fd=6)
+
+7 -> ClientConnection(fd=7)
+
+----------------------------------------------------
+
+8. OWNERSHIP CHAIN
+
+ConnectionManager
+        |
+        V
+ClientConnection
+        |
+        V
+Socket fd
+
+Meaning:
+
+ConnectionManager owns ClientConnection.
+
+ClientConnection owns socket fd.
+
+----------------------------------------------------
+
+9. ADD CLIENT
+
+Code:
+
+clients[client->getFd()] = std::move(client);
+
+Meaning:
+
+Transfer ownership from local unique_ptr
+to ConnectionManager.
+
+After move:
+
+client == nullptr
+
+because ownership has moved.
+
+----------------------------------------------------
+
+10. GET CLIENT
+
+Code:
+
+auto it = clients.find(fd);
+
+Purpose:
+
+Find a client using its file descriptor.
+
+If found:
+
+return it->second.get();
+
+Returns:
+
+ClientConnection*
+
+without transferring ownership.
+
+ConnectionManager remains the owner.
+
+----------------------------------------------------
+
+11. REMOVE CLIENT
+
+Code:
+
+clients.erase(fd);
+
+What happens:
+
+Map Entry Removed
+        ↓
+unique_ptr Destroyed
+        ↓
+ClientConnection Destroyed
+        ↓
+Destructor Runs
+        ↓
+close(fd)
+
+Automatic cleanup.
+
+----------------------------------------------------
+
+12. IMPORTANT RULE
+
+If:
+
+ClientConnection* c =
+    manager.getClient(5);
+
+Then NEVER do:
+
+delete c;
+
+Reason:
+
+ConnectionManager owns the object.
+
+Only the owner destroys the object.
+
+----------------------------------------------------
+
+13. CONCEPTS LEARNED
+
+✓ Ownership
+✓ RAII
+✓ Constructor
+✓ Destructor
+✓ Resource Management
+✓ unique_ptr
+✓ std::move
+✓ Encapsulation
+✓ ConnectionManager
+✓ Ownership Chain
+
+----------------------------------------------------
+
+14. NEXT STEP
+
+Integrate ConnectionManager into Server.cpp
+
+Replace:
+
+events[i].data.fd
+
+With:
+
+ClientConnection objects
+
+Goal:
+
+Move Mini Redis toward a professional
+event-driven server architecture.
+
+====================================================
+END OF NOTES
+====================================================
+
+TOPIC: OBJECT LIFETIME MANAGEMENT
+
+ConnectionManager owns all ClientConnection objects.
+
+ClientConnection owns:
+- socket fd
+- readBuffer
+- writeBuffer
+
+Connection Flow:
+
+accept()
+   ↓
+create ClientConnection
+   ↓
+move into ConnectionManager
+   ↓
+ConnectionManager becomes owner
+
+Disconnect Flow:
+
+removeClient()
+   ↓
+erase()
+   ↓
+unique_ptr destroyed
+   ↓
+ClientConnection destroyed
+   ↓
+close(fd)
+
+Benefits:
+- No manual delete
+- No manual socket cleanup
+- Clear ownership
+- Safer architecture
+
+********************************************************************************************************************************
+********************************************************************************************************************************
+********************************************************************************************************************************
+
+TOPIC: ENCAPSULATION
+
+Bad Design:
+
+client->getReadBuffer().clear();
+
+Reason:
+Server directly manipulates internal data.
+
+Good Design:
+
+client->clearReadBuffer();
+
+Reason:
+ClientConnection manages its own state.
+
+Principle:
+
+Tell an object WHAT to do.
+Do not manipulate its internals directly.
+
+Concept Learned:
+✓ Encapsulation
+✓ Information Hiding
+✓ Better OOP Design
+
+
+************************************************************************************************************************
+************************************************************************************************************************
+************************************************************************************************************************
+TOPIC: WRITE BUFFER
+
+Purpose:
+Store outgoing data for a client.
+
+Why?
+
+send() is not guaranteed to send
+all bytes at once.
+
+Example:
+
+Response:
+PONGPONGPONG
+
+Actually Sent:
+PONG
+
+Remaining:
+PONGPONG
+
+Store remaining data inside:
+
+writeBuffer
+
+Benefits:
+
+✓ Handles partial sends
+✓ Supports non-blocking sockets
+✓ Keeps per-client state
+✓ Scales to large responses
+
+Client State:
+
+ClientConnection
+    ├── fd
+    ├── readBuffer
+    └── writeBuffer

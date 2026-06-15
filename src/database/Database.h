@@ -16,4 +16,6 @@ public:
     string get(const string& key);
 
     void del(const string& key);
+
+const unordered_map<string,string>& getAllData() const;
 };

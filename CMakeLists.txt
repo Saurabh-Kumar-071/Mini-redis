@@ -13,6 +13,7 @@ add_executable(
     src/command/CommandExecutor.cpp
     src/client/ClientConnection.cpp
     src/client/ClientManager.cpp
+    src/persistence/PersistenceManager.cpp
     src/utils/Split.cpp
 )
 

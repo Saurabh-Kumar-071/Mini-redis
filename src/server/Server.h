@@ -4,6 +4,7 @@
 #include "../command/CommandParser.h"
 #include "../command/CommandExecutor.h"
 #include "../client/ClientManager.h"
+#include "../persistence/PersistenceManager.h"
 
 class Server
 {
@@ -12,6 +13,7 @@ private:
     CommandParser parser;
     CommandExecutor executor;
     ConnectionManager connectionManager;
+    PersistenceManager persistence;
 
 public:
     Server();

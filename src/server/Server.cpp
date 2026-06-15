@@ -11,8 +11,10 @@
 #include <sstream>
 using namespace std;
 
-Server::Server(): executor(db){
+Server::Server(): executor(db ,persistence){
+    persistence.load(db);
 }
+
 bool setNonBlocking(int fd);
 void Server::start(){
 

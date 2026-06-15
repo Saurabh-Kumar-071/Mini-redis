@@ -15,6 +15,10 @@ string Database :: get( const string&key) {
 }
 
 void Database ::del(const  string &key){
-    
+
    data.erase(key);
+}
+
+const unordered_map<string,string>& Database::getAllData() const{
+    return data;
 }

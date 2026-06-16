@@ -2,6 +2,7 @@
 
 #include <string>
 #include <unordered_map>
+#include "../exception/DatabaseException.h"
 using namespace std;
 
 class Database

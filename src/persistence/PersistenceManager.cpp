@@ -8,8 +8,9 @@ void  PersistenceManager::save(const Database& db){
 
   ofstream file("dump.rdb");  // open the file if not create yet then create it (for write )
 
-  if(!file) return; // like it file is full then it open the you return
-
+  if(!file) {// like it file is full then it open the you return
+      throw PersistenceException("Failed to open dump.rdb for writing");
+  }
   const auto& data = db.getAllData();
 
   for( const auto& pair : data){
@@ -21,7 +22,9 @@ void  PersistenceManager::save(const Database& db){
 void PersistenceManager ::load( Database& db){
    ifstream file("dump.rdb"); // open the file and read
 
-   if(!file)return;
+   if(!file){
+     throw PersistenceException("Failed to open dump.rdb for reading");
+   }
   string line;
 
   while(getline(file ,line)){

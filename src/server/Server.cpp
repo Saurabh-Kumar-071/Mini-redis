@@ -1,4 +1,5 @@
 #include "Server.h"
+
 #include <iostream>
 #include <sys/socket.h>//socket()
 #include <netinet/in.h>//sockaddr_in(ip and port number)
@@ -21,15 +22,11 @@ void Server::start(){
    int server_fd = socket(AF_INET, SOCK_STREAM, 0);
 
    if(server_fd== -1){
-      cout<<"Socket Creation is failed!";
-      close(server_fd);
-      return;
+       throw SocketException("Socket Creation is failed!");
     }
 
    if(!setNonBlocking(server_fd)){
-    cout << "Failed to make server socket non-blocking" << endl;
-    close(server_fd);
-    return;
+      throw SocketException("Failed to make server socket non-blocking");
      }
 
     cout<<"Socket Creation is Successfully"<<endl;
@@ -40,23 +37,19 @@ void Server::start(){
     server_addr.sin_addr.s_addr=INADDR_ANY;
 
     if(bind(server_fd , (sockaddr*)&server_addr , sizeof(server_addr)) < 0){
-      cout<<"Bind connection is failed!"<<strerror(errno)<<endl;
-      close(server_fd);
-      return;
+      throw SocketException(string("Bind connection is failed!")+strerror(errno));
     }
     cout<<"Bind connection is successfully"<<endl;
 
     if(listen(server_fd ,5) <0){
-      cout<<"Listen failed!";
-      close(server_fd);
+       throw SocketException(string("Listen failed!")+strerror(errno));
     }
 
     cout<<"Waiting for client"<<endl;
     int epoll_fd = epoll_create1(0);
 
     if(epoll_fd ==-1){
-      cout<<"epoll creation failed!";
-      return ;
+     throw SocketException(string("epoll creation failed!")+strerror(errno));
     }
 
     epoll_event ev{};
@@ -64,8 +57,7 @@ void Server::start(){
      ev.data.fd = server_fd;
 
     if(epoll_ctl(epoll_fd,EPOLL_CTL_ADD,server_fd,&ev) == -1){
-    cout<<"epoll_ctl failed"<<endl;
-    return ;
+       throw SocketException(string("epoll_ctl failed")+strerror(errno));
      }
 
      epoll_event events[10];
@@ -73,8 +65,8 @@ void Server::start(){
     while( true){
       int num_events = epoll_wait( epoll_fd , events ,10 ,-1);
 
-      if(num_events ==-1){
-        cout<<"epoll_wait failed!"<<endl;
+    if(num_events ==-1){
+         throw SocketException(string("epoll_wait failed!")+strerror(errno));
       }
 
     for(int i = 0; i < num_events; i++){

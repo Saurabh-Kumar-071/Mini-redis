@@ -5,6 +5,7 @@
 #include "../command/CommandExecutor.h"
 #include "../client/ClientManager.h"
 #include "../persistence/PersistenceManager.h"
+#include "../exception/SocketException.h"
 
 class Server
 {

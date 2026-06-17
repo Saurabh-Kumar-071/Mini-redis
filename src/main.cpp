@@ -1,11 +1,14 @@
 #include<iostream>
 #include "server/Server.h"
+
 using namespace std;
 
 int main(){
 
 try{
-     Server server;
+     FileLogger fileLogger;
+    // ConsoleLogger consoleLogger;
+     Server server(fileLogger);
    server.start();
   }
   catch(const SocketException& e){
@@ -20,6 +23,6 @@ try{
   catch(...){
     cout << "Unknown Error" << endl;
   }
-  
+
     return 0;
 }

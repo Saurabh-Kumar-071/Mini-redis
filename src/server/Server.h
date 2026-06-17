@@ -6,6 +6,10 @@
 #include "../client/ClientManager.h"
 #include "../persistence/PersistenceManager.h"
 #include "../exception/SocketException.h"
+#include "../logger/ConsoleLogger.h"
+#include "../logger/FileLogger.h"
+
+class ILogger;
 
 class Server
 {
@@ -16,8 +20,9 @@ private:
     ConnectionManager connectionManager;
     PersistenceManager persistence;
 
+    ILogger& logger;
 public:
-    Server();
+    Server(ILogger& logger);
 
     void start();
 };

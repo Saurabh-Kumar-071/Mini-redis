@@ -14,6 +14,8 @@ add_executable(
     src/client/ClientConnection.cpp
     src/client/ClientManager.cpp
     src/persistence/PersistenceManager.cpp
+    src/logger/ConsoleLogger.cpp
+    src/logger/FileLogger.cpp
     src/utils/Split.cpp
 )
 

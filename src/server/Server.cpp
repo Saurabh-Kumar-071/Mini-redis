@@ -12,7 +12,7 @@
 #include <sstream>
 using namespace std;
 
-Server::Server(): executor(db ,persistence){
+Server::Server(ILogger& logger): logger(logger), executor(db ,persistence){
     persistence.load(db);
 }
 
@@ -29,7 +29,7 @@ void Server::start(){
       throw SocketException("Failed to make server socket non-blocking");
      }
 
-    cout<<"Socket Creation is Successfully"<<endl;
+    logger.info("Socket Creation Successfully");
 
     sockaddr_in server_addr{};
     server_addr.sin_family = AF_INET;
@@ -39,13 +39,14 @@ void Server::start(){
     if(bind(server_fd , (sockaddr*)&server_addr , sizeof(server_addr)) < 0){
       throw SocketException(string("Bind connection is failed!")+strerror(errno));
     }
-    cout<<"Bind connection is successfully"<<endl;
+
+    logger.info("Bind connection is successfully");
 
     if(listen(server_fd ,5) <0){
        throw SocketException(string("Listen failed!")+strerror(errno));
     }
 
-    cout<<"Waiting for client"<<endl;
+    logger.info("Waiting for client");
     int epoll_fd = epoll_create1(0);
 
     if(epoll_fd ==-1){
@@ -72,11 +73,12 @@ void Server::start(){
     for(int i = 0; i < num_events; i++){
 
          if(events[i].data.fd == server_fd){
-            cout<<"New Client Arrived"<<endl;
+            logger.info("New Client Arrived");
+
             int client_fd =accept(server_fd,nullptr,nullptr);
 
             if(client_fd == -1){
-             cout<<"Accepted Failed! "<<endl;
+            logger.error("Client connection Accepted Failed!");
              continue;
              }
 
@@ -85,7 +87,7 @@ void Server::start(){
 
 
         if(!setNonBlocking(client_fd)){
-         cout << "Failed to make client socket non-blocking" << endl;
+         logger.error("Failed to make client socket non-blocking" );
          close(client_fd);
           continue;
           }
@@ -96,10 +98,10 @@ void Server::start(){
         client_event.data.fd = client_fd;
 
        if(epoll_ctl(epoll_fd,EPOLL_CTL_ADD,client_fd,&client_event)==-1){
-        cout<<"Client Regestire unsuccessfull with epoll"<<endl;
+         logger.info("Client Regestire unsuccessfull with epoll");
        }
 
-         cout<<"Accepted client FD:"<<client_fd<<endl;
+        logger.info(string("Accepted Client FD:" )+ to_string(client_fd));
 
     }else{
        char buffer[1024];
@@ -136,7 +138,7 @@ void Server::start(){
         cout << "No more data available" << endl;
             }
        else{
-        cout << "recv failed: "<< strerror(errno)<< endl;
+        logger.error(string("Recv failed: ") + strerror(errno));
          }
         }
     }

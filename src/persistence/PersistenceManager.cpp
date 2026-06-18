@@ -12,11 +12,22 @@ void  PersistenceManager::save(const Database& db){
       throw PersistenceException("Failed to open dump.rdb for writing");
   }
   const auto& data = db.getAllData();
+  const auto& expiry = db.getAllExpiry();
 
   for( const auto& pair : data){
-    file<<pair.first<<"="<<pair.second<<endl;
-  }
 
+    auto it = expiry.find(pair.first);
+
+    if(it!= expiry.end()){
+      auto timestamp = chrono::system_clock::to_time_t(it->second);
+
+      file<<pair.first<<"="<<pair.second<<"|"<<timestamp<<endl;
+    }
+
+    else{
+      file<<pair.first<<"="<<pair.second<<endl;
+    }
+  }
 }
 
 void PersistenceManager ::load( Database& db){
@@ -34,10 +45,29 @@ void PersistenceManager ::load( Database& db){
     if(pos == string::npos)continue;
 
     string key = line.substr(0,pos);
-    string value = line.substr(pos+1);
+    string valuePart = line.substr(pos+1);
 
-    db.set(key ,value);
+    size_t ttlpos = valuePart.find('|');
+
+    if(ttlpos == string::npos){
+      db.set(key,valuePart);
+    }
+
+    else{
+       string value = valuePart.substr(0,ttlpos);
+       string timestampStr = valuePart.substr(ttlpos+1);
+
+       time_t timestamp = stoll(timestampStr);
+
+      auto expiryTime = chrono::system_clock::from_time_t(timestamp);
+
+      if(expiryTime <=chrono::system_clock::now()){
+          continue;
+         }
+
+      db.set(key,value);
+
+      db.setExpiryTime(key,expiryTime);
+    }
   }
-
-
 }

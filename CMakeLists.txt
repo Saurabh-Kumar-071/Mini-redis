@@ -16,6 +16,7 @@ add_executable(
     src/persistence/PersistenceManager.cpp
     src/logger/ConsoleLogger.cpp
     src/logger/FileLogger.cpp
+    src/logger/CompositeLogger.cpp
     src/utils/Split.cpp
 )
 

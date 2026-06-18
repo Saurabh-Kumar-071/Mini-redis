@@ -29,6 +29,17 @@ string CommandExecutor ::execute(const ParsedCommand& cmd){
     return "delete from database!";
   }
 
+  else if(cmd.command=="EXPIRE"){
+    int val = stoi(cmd.value);
+    db.expire(cmd.key ,val);
+    persistence.save(db);
+    return "ok";
+  }
+
+  else if(cmd.command=="TTL"){
+    return to_string(db.ttl(cmd.key));
+  }
+
   return "UNKNOWN COMMMAND!";
 
   }

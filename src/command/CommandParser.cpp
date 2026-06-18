@@ -8,6 +8,7 @@ ParsedCommand CommandParser::parse( const string &input){
 
       ParsedCommand result;
       stringstream ss(input);
+      
        ss>>result.command;
        ss>>result.key;
        ss>>result.value;

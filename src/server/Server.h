@@ -6,8 +6,6 @@
 #include "../client/ClientManager.h"
 #include "../persistence/PersistenceManager.h"
 #include "../exception/SocketException.h"
-#include "../logger/ConsoleLogger.h"
-#include "../logger/FileLogger.h"
 
 class ILogger;
 

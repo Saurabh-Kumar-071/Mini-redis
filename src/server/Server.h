@@ -12,6 +12,8 @@ class ILogger;
 class Server
 {
 private:
+    int server_fd;
+
     Database db;
     CommandParser parser;
     CommandExecutor executor;
@@ -21,6 +23,10 @@ private:
     ILogger& logger;
 public:
     Server(ILogger& logger);
+
+    Server(const Server&) = delete;
+    Server& operator=(const Server&) = delete;
+    ~Server();
 
     void start();
 };

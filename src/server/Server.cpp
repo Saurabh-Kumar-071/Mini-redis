@@ -1,25 +1,27 @@
 #include "Server.h"
 #include "../logger/ILogger.h"
+#include "../network/EpollManager.h"
 #include <iostream>
 #include <sys/socket.h>//socket()
 #include <netinet/in.h>//sockaddr_in(ip and port number)
 #include <unistd.h>//close()
 #include <cstring>
-#include <sys/epoll.h>
 #include<thread>
 #include <cerrno>
 #include <fcntl.h>
 #include <sstream>
 using namespace std;
 
-Server::Server(ILogger& logger): logger(logger), executor(db ,persistence){
+Server::Server(ILogger& logger): logger(logger), executor(db ,persistence),server_fd(-1){
     persistence.load(db);
 }
+
+EpollManager epollManager;
 
 bool setNonBlocking(int fd);
 void Server::start(){
 
-   int server_fd = socket(AF_INET, SOCK_STREAM, 0);
+    server_fd = socket(AF_INET, SOCK_STREAM, 0);
 
    if(server_fd== -1){
        throw SocketException("Socket Creation is failed!");
@@ -47,24 +49,13 @@ void Server::start(){
     }
 
     logger.info("Waiting for client");
-    int epoll_fd = epoll_create1(0);
 
-    if(epoll_fd ==-1){
-     throw SocketException(string("epoll creation failed!")+strerror(errno));
-    }
-
-    epoll_event ev{};
-     ev.events = EPOLLIN;
-     ev.data.fd = server_fd;
-
-    if(epoll_ctl(epoll_fd,EPOLL_CTL_ADD,server_fd,&ev) == -1){
-       throw SocketException(string("epoll_ctl failed")+strerror(errno));
-     }
+    epollManager.addFd(server_fd);
 
      epoll_event events[10];
 
     while( true){
-      int num_events = epoll_wait( epoll_fd , events ,10 ,-1);
+      int num_events = epollManager.wait(events ,10);
 
     if(num_events ==-1){
          throw SocketException(string("epoll_wait failed!")+strerror(errno));
@@ -72,12 +63,27 @@ void Server::start(){
 
     for(int i = 0; i < num_events; i++){
 
+        if(events[i].events & EPOLLRDHUP){
+          logger.info("Client disconnected");
+
+          epollManager.removeFd(events[i].data.fd);
+
+          connectionManager.removeClient(events[i].data.fd);
+
+          continue;
+        }
+
          if(events[i].data.fd == server_fd){
             logger.info("New Client Arrived");
 
-            int client_fd =accept(server_fd,nullptr,nullptr);
+            while(true){
+
+             int client_fd =accept(server_fd,nullptr,nullptr);
 
             if(client_fd == -1){
+              if(errno==EAGAIN ||errno == EWOULDBLOCK){
+                break;
+              }
             logger.error("Client connection Accepted Failed!");
              continue;
              }
@@ -92,19 +98,14 @@ void Server::start(){
           continue;
           }
 
-        epoll_event client_event{};
-
-        client_event.events = EPOLLIN;
-        client_event.data.fd = client_fd;
-
-       if(epoll_ctl(epoll_fd,EPOLL_CTL_ADD,client_fd,&client_event)==-1){
-         logger.info("Client Regestire unsuccessfull with epoll");
-       }
+         epollManager.addFd(client_fd);
 
         logger.info(string("Accepted Client FD:" )+ to_string(client_fd));
-
+        }
     }else{
        char buffer[1024];
+
+       while(true){
        int bytes_received = recv(events[i].data.fd , buffer , sizeof(buffer) ,0);
 
        if(bytes_received > 0){
@@ -127,9 +128,10 @@ void Server::start(){
        else if (bytes_received ==0){
 
         cout<<"Client disconnect"<<endl;
-         epoll_ctl( epoll_fd,EPOLL_CTL_DEL,events[i].data.fd,nullptr);
+        epollManager.removeFd(events[i].data.fd);
 
          connectionManager.removeClient(events[i].data.fd);
+         break;
        }
 
       else{
@@ -140,13 +142,13 @@ void Server::start(){
        else{
         logger.error(string("Recv failed: ") + strerror(errno));
          }
+        break;
         }
     }
+  }
  }
 }
 
-    close(epoll_fd);
-    close(server_fd);
 }
 // this is the function for checking the socket is blcokig
 
@@ -154,15 +156,19 @@ bool setNonBlocking(int fd)
 {
     int flags = fcntl(fd, F_GETFL, 0);
 
-    if(flags == -1)
-    {
+    if(flags == -1){
         return false;
     }
 
-    if(fcntl(fd, F_SETFL, flags | O_NONBLOCK) == -1)
-    {
+    if(fcntl(fd, F_SETFL, flags | O_NONBLOCK) == -1){
         return false;
     }
 
     return true;
+}
+
+Server::~Server()
+{
+    if(server_fd != -1)
+        close(server_fd);
 }

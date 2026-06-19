@@ -17,6 +17,7 @@ add_executable(
     src/logger/ConsoleLogger.cpp
     src/logger/FileLogger.cpp
     src/logger/CompositeLogger.cpp
+    src/network/EpollManager.cpp
     src/utils/Split.cpp
 )
 

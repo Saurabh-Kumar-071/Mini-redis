@@ -1,17 +1,15 @@
-
+#include "../network/FileDescriptor.h"
 #pragma once
 using namespace std;
 #include<string>
 
 class ClientConnection{
 private:
-    int fd;
+    FileDescriptor fd;
     string readBuffer;
     string writeBuffer;
 public:
     ClientConnection(int fd);
-
-    ~ClientConnection();
 
     int getFd() const;
 
@@ -24,7 +22,7 @@ public:
     void clearReadBuffer();
 
     void appendToWriteBuffer(const string& data);
-    
+
     void clearWriteBuffer();
 
 };

@@ -6,13 +6,13 @@
 #include "../client/ClientManager.h"
 #include "../persistence/PersistenceManager.h"
 #include "../exception/SocketException.h"
-
+#include "../network/FileDescriptor.h"
 class ILogger;
 
 class Server
 {
 private:
-    int server_fd;
+    FileDescriptor server_fd;
 
     Database db;
     CommandParser parser;
@@ -26,7 +26,6 @@ public:
 
     Server(const Server&) = delete;
     Server& operator=(const Server&) = delete;
-    ~Server();
 
     void start();
 };

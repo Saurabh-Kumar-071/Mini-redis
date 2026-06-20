@@ -18,6 +18,7 @@ add_executable(
     src/logger/FileLogger.cpp
     src/logger/CompositeLogger.cpp
     src/network/EpollManager.cpp
+    src/network/FileDescriptor.cpp
     src/utils/Split.cpp
 )
 

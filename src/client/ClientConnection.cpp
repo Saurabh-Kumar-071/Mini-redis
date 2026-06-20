@@ -5,14 +5,8 @@
 ClientConnection::ClientConnection(int fd): fd(fd){
 }
 
-ClientConnection::~ClientConnection(){
-    if(fd != -1){
-        close(fd);
-    }
-}
-
 int ClientConnection::getFd() const{
-    return fd;
+    return fd.get();
 }
 
 void ClientConnection::appendToReadBuffer(const string& data){

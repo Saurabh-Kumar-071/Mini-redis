@@ -40,6 +40,10 @@ string CommandExecutor ::execute(const ParsedCommand& cmd){
     return to_string(db.ttl(cmd.key));
   }
 
+  else if(cmd.command == "BIG"){
+    return string(10000000, 'A'); // only for testing why EPOLLOUT needed
+}
+
   return "UNKNOWN COMMMAND!";
 
   }

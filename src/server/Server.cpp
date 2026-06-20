@@ -21,13 +21,13 @@ EpollManager epollManager;
 bool setNonBlocking(int fd);
 void Server::start(){
 
-    server_fd = socket(AF_INET, SOCK_STREAM, 0);
+    server_fd = FileDescriptor(socket(AF_INET, SOCK_STREAM, 0));
 
-   if(server_fd== -1){
+   if(server_fd.get()== -1){
        throw SocketException("Socket Creation is failed!");
     }
 
-   if(!setNonBlocking(server_fd)){
+   if(!setNonBlocking(server_fd.get())){
       throw SocketException("Failed to make server socket non-blocking");
      }
 
@@ -38,19 +38,19 @@ void Server::start(){
     server_addr.sin_port = htons(8080);
     server_addr.sin_addr.s_addr=INADDR_ANY;
 
-    if(bind(server_fd , (sockaddr*)&server_addr , sizeof(server_addr)) < 0){
+    if(bind(server_fd.get() , (sockaddr*)&server_addr , sizeof(server_addr)) < 0){
       throw SocketException(string("Bind connection is failed!")+strerror(errno));
     }
 
     logger.info("Bind connection is successfully");
 
-    if(listen(server_fd ,5) <0){
+    if(listen(server_fd.get() ,5) <0){
        throw SocketException(string("Listen failed!")+strerror(errno));
     }
 
     logger.info("Waiting for client");
 
-    epollManager.addFd(server_fd);
+    epollManager.addFd(server_fd.get());
 
      epoll_event events[10];
 
@@ -73,12 +73,43 @@ void Server::start(){
           continue;
         }
 
-         if(events[i].data.fd == server_fd){
+        if(events[i].events & EPOLLOUT){
+         ClientConnection* client =connectionManager.getClient(events[i].data.fd);
+         if(client == nullptr)continue;
+
+         string& buffer =client->getWriteBuffer();
+
+       int sent =send(events[i].data.fd,buffer.c_str(),buffer.size(),0);
+    
+        if(sent == -1){
+              if(errno == EAGAIN ||errno == EWOULDBLOCK){
+                   sent = 0;
+                     }
+               else{
+                 logger.error(string("send failed: ") + strerror(errno));
+                 epollManager.removeFd(events[i].data.fd );
+
+                 connectionManager.removeClient(events[i].data.fd);
+
+                  continue;
+                }
+              }
+
+        if(sent > 0){
+         buffer.erase(0, sent);
+             if(buffer.empty()){
+              epollManager.modifyFd(events[i].data.fd,EPOLLIN |EPOLLET |EPOLLRDHUP);
+            }
+               }
+          continue;
+     }
+
+         if(events[i].data.fd == server_fd.get()){
             logger.info("New Client Arrived");
 
             while(true){
 
-             int client_fd =accept(server_fd,nullptr,nullptr);
+             int client_fd =accept(server_fd.get(),nullptr,nullptr);
 
             if(client_fd == -1){
               if(errno==EAGAIN ||errno == EWOULDBLOCK){
@@ -121,7 +152,26 @@ void Server::start(){
         if(cmd.command.empty()) continue;
 
          string response = executor.execute(cmd);
-         send(events[i].data.fd , response.c_str(), response.size() ,0);
+         int sent = send(events[i].data.fd , response.c_str(), response.size() ,0);
+
+         if(sent == -1){
+              if(errno == EAGAIN ||errno == EWOULDBLOCK){
+                   sent = 0;
+                     }
+               else{
+                 logger.error(string("send failed: ") + strerror(errno));
+                }
+              }
+
+              if(sent < response.size()){
+                 ClientConnection* client = connectionManager.getClient(events[i].data.fd);
+                 client->appendToWriteBuffer( response.substr(sent));
+
+                 epollManager.modifyFd(events[i].data.fd,EPOLLIN |EPOLLET | EPOLLRDHUP |EPOLLOUT);
+                  cout << "Partial write detected"<< endl;
+              }
+
+
          client->clearReadBuffer();
        }
 
@@ -167,8 +217,3 @@ bool setNonBlocking(int fd)
     return true;
 }
 
-Server::~Server()
-{
-    if(server_fd != -1)
-        close(server_fd);
-}

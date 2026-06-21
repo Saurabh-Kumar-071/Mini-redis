@@ -19,6 +19,7 @@ add_executable(
     src/logger/CompositeLogger.cpp
     src/network/EpollManager.cpp
     src/network/FileDescriptor.cpp
+    src/scheduler/Scheduler.cpp
     src/utils/Split.cpp
 )
 

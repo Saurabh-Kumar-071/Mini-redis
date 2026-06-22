@@ -11,25 +11,38 @@ int Scheduler::waitForEvents(epoll_event events[],int maxEvents){
 }
                                                  //somelamda
 void Scheduler ::registerHandler(int fd,std::function<void(epoll_event&)> handler){
-    handlers[fd] = handler; //Now fd  knows which function to call.
+     contexts[fd].handler = handler;
 }
 
-void Scheduler :: removeHandler(int fd){
-    handlers.erase(fd);
-}
 
 void Scheduler::dispatch(epoll_event& event){ // dispatch function
     int fd = event.data.fd;
 
-    auto it = handlers.find(fd);
+    auto it = contexts.find(fd);
 
-    if(it != handlers.end())
+    if(it != contexts.end() && it->second.handler)
     {
-        it->second(event);
+        it->second.handler(event);
     }
 }
 
+ClientConnection* Scheduler::getClient(int fd)
+{
+    auto it = contexts.find(fd);
+
+    if(it == contexts.end())
+        return nullptr;
+
+    return it->second.client.get();
+}
 
 
+void Scheduler::registerContext(int fd,std::unique_ptr<ClientConnection> client,std::function<void(epoll_event&)> handler){
+    contexts[fd].client = std::move(client);
+    contexts[fd].handler = handler;
+}
 
 
+void Scheduler::removeContext(int fd){
+    contexts.erase(fd);
+}

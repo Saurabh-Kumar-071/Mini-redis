@@ -3,7 +3,6 @@
 #include "../database/Database.h"
 #include "../command/CommandParser.h"
 #include "../command/CommandExecutor.h"
-#include "../client/ClientManager.h"
 #include "../persistence/PersistenceManager.h"
 #include "../exception/SocketException.h"
 #include "../network/FileDescriptor.h"
@@ -21,7 +20,6 @@ private:
     CommandParser parser;             //Construct parser
     PersistenceManager persistence;   //construct peristance
     CommandExecutor executor;         // construct executor(db , persistance)
-    ConnectionManager connectionManager;; // construct connectionmanager
     FileDescriptor server_fd;            // construct server_fd(-1)
     Scheduler scheduler;                //construct schedular(epollManager)
     ILogger& logger;                    //Store logger reference
@@ -33,4 +31,9 @@ public:
     Server& operator=(const Server&) = delete;
 
     void start();
+
+    void disconnectClient(int fd){
+        epollManager.removeFd(fd);scheduler.removeContext(fd);
+    }
+
 };

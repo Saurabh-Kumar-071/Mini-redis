@@ -1,162 +1,183 @@
 #include "Server.h"
 #include "../logger/ILogger.h"
 #include <iostream>
-#include <sys/socket.h>//socket()
-#include <netinet/in.h>//sockaddr_in(ip and port number)
-#include <unistd.h>//close()
+#include <sys/socket.h> //socket()
+#include <netinet/in.h> //sockaddr_in(ip and port number)
+#include <unistd.h>     //close()
 #include <cstring>
-#include<thread>
+#include <thread>
 #include <cerrno>
 #include <fcntl.h>
 #include <sstream>
 using namespace std;
-                                 // ----------------member initializer list.----------------------------------//
-Server::Server(ILogger& logger): logger(logger), executor(db ,persistence),server_fd(-1) , scheduler(epollManager){
-    persistence.load(db);                        //[ Construct executor    //[Create FileDescriptor  //[Give Scheduler a reference
-                                                //using this Server's db   //containing invalid fd.]  //to Server's epollManager.]
-                                                //and persistence objects.]
+// ----------------member initializer list.----------------------------------//
+Server::Server(ILogger &logger) : logger(logger), executor(db, persistence), server_fd(-1), scheduler(epollManager)
+{
+  persistence.load(db); //[ Construct executor    //[Create FileDescriptor  //[Give Scheduler a reference
+                        // using this Server's db   //containing invalid fd.]  //to Server's epollManager.]
+                        // and persistence objects.]
 }
-
 
 bool setNonBlocking(int fd);
 
-void Server::handleClientEvent(epoll_event& event){
+void Server::handleClientEvent(epoll_event &event)
+{
+  cout << "handleClientEvent FD = "<< event.data.fd<< endl;
 
+  if (event.events & EPOLLOUT)
+  {
+    ClientConnection *client = scheduler.getClient(event.data.fd);
+    if (client == nullptr)
+      return;
 
-        if(event.events & EPOLLOUT){
-         ClientConnection* client =connectionManager.getClient(event.data.fd);
-         if(client == nullptr)return;
+    string &buffer = client->getWriteBuffer();
 
-         string& buffer =client->getWriteBuffer();
+    int sent = send(event.data.fd, buffer.c_str(), buffer.size(), 0);
 
-          int sent =send(event.data.fd,buffer.c_str(),buffer.size(),0);
+    if (sent == -1)
+    {
+      if (errno == EAGAIN || errno == EWOULDBLOCK)
+      {
+        sent = 0;
+      }
+      else
+      {
+        logger.error(string("send failed: ") + strerror(errno));
+        disconnectClient(event.data.fd);
+        return;
+      }
+    }
 
-           if(sent == -1){
-              if(errno == EAGAIN ||errno == EWOULDBLOCK){
-                   sent = 0;
-                     }
-               else{
-                 logger.error(string("send failed: ") + strerror(errno));
-                 epollManager.removeFd(event.data.fd );
+    if (sent > 0)
+    {
+      buffer.erase(0, sent);
+      if (buffer.empty())
+      {
+        epollManager.modifyFd(event.data.fd, EPOLLIN | EPOLLET | EPOLLRDHUP);
+      }
+    }
+    return;
+  }
 
-                 connectionManager.removeClient(event.data.fd);
-                 scheduler.removeHandler(event.data.fd);
-                  return;
-                }
-              }
+  ClientConnection *client =
+      scheduler.getClient(event.data.fd);
 
-        if(sent > 0){
-         buffer.erase(0, sent);
-             if(buffer.empty()){
-              epollManager.modifyFd(event.data.fd,EPOLLIN |EPOLLET |EPOLLRDHUP);
-            }
-               }
-          return;
-     }
+  if (client == nullptr)
+    return;
+  char buffer[1024];
 
-     ClientConnection* client =
-        connectionManager.getClient(event.data.fd);
+  while (true)
+  {
+    int bytes_received = recv(event.data.fd, buffer, sizeof(buffer), 0);
+    cout << "recv returned = "<< bytes_received << endl;
 
-         if(client == nullptr) return;
-       char buffer[1024];
+    if (bytes_received > 0)
+    {
 
-       while(true){
-       int bytes_received = recv(event.data.fd , buffer , sizeof(buffer) ,0);
+      string incoming(buffer, bytes_received);
+      cout<<"Received :"<<incoming<<endl;
+      client->appendToReadBuffer(incoming);
 
-       if(bytes_received > 0){
+      ParsedCommand cmd = parser.parse(client->getReadBuffer());
+      cout<<"cmd command:"<<" ,"<<cmd.command<<"cmd key:"<<cmd.key<<" ,"<<"cmd val:"<<" "<<cmd.value<<endl;
+      if (cmd.command.empty())
+        continue;
 
+      string response = executor.execute(cmd);
 
-         string incoming(buffer, bytes_received);
-         client->appendToReadBuffer(incoming);
+      cout<<"Response:"<<response<<endl;
+      int sent = send(event.data.fd, response.c_str(), response.size(), 0);
 
-         ParsedCommand cmd = parser.parse(client->getReadBuffer());
-        if(cmd.command.empty()) continue;
+      if (sent == -1)
+      {
+        if (errno == EAGAIN || errno == EWOULDBLOCK)
+        {
+          sent = 0;
+        }
+        else
+        {
+          logger.error(string("send failed: ") + strerror(errno));
+          disconnectClient(event.data.fd);
+        }
+      }
 
-         string response = executor.execute(cmd);
-         int sent = send(event.data.fd , response.c_str(), response.size() ,0);
+      if (sent < response.size())
+      {
+        client->appendToWriteBuffer(response.substr(sent));
 
-         if(sent == -1){
-              if(errno == EAGAIN ||errno == EWOULDBLOCK){
-                   sent = 0;
-                     }
-               else{
-                 logger.error(string("send failed: ") + strerror(errno));
-                }
-              }
+        epollManager.modifyFd(event.data.fd, EPOLLIN | EPOLLET | EPOLLRDHUP | EPOLLOUT);
+        cout << "Partial write detected" << endl;
+      }
 
-              if(sent < response.size()){
-                 client->appendToWriteBuffer( response.substr(sent));
+      client->clearReadBuffer();
+    }
 
-                 epollManager.modifyFd(event.data.fd,EPOLLIN |EPOLLET | EPOLLRDHUP |EPOLLOUT);
-                  cout << "Partial write detected"<< endl;
-              }
+    else if (bytes_received == 0)
+    {
 
+      cout << "Client disconnect" << endl;
+      disconnectClient(event.data.fd);
+      break;
+    }
 
-         client->clearReadBuffer();
-       }
+    else
+    {
 
-       else if (bytes_received ==0){
-
-        cout<<"Client disconnect"<<endl;
-        epollManager.removeFd(event.data.fd);
-
-        scheduler.removeHandler(event.data.fd);
-
-         connectionManager.removeClient(event.data.fd);
-         break;
-       }
-
-      else{
-
-         if(errno == EAGAIN || errno == EWOULDBLOCK){
+      if (errno == EAGAIN || errno == EWOULDBLOCK)
+      {
         cout << "No more data available" << endl;
-            }
-       else{
+      }
+      else
+      {
         logger.error(string("Recv failed: ") + strerror(errno));
-         }
-        break;
-        }
+        disconnectClient(event.data.fd);
+      }
+      break;
     }
+  }
+}
 
+void Server::start()
+{
 
-        }
+  server_fd = FileDescriptor(socket(AF_INET, SOCK_STREAM, 0));
 
+  if (server_fd.get() == -1)
+  {
+    throw SocketException("Socket Creation is failed!");
+  }
 
-void Server::start(){
+  if (!setNonBlocking(server_fd.get()))
+  {
+    throw SocketException("Failed to make server socket non-blocking");
+  }
 
-    server_fd = FileDescriptor(socket(AF_INET, SOCK_STREAM, 0));
+  logger.info("Socket Creation Successfully");
 
-   if(server_fd.get()== -1){
-       throw SocketException("Socket Creation is failed!");
-    }
+  sockaddr_in server_addr{};
+  server_addr.sin_family = AF_INET;
+  server_addr.sin_port = htons(8080);
+  server_addr.sin_addr.s_addr = INADDR_ANY;
 
-   if(!setNonBlocking(server_fd.get())){
-      throw SocketException("Failed to make server socket non-blocking");
-     }
+  if (bind(server_fd.get(), (sockaddr *)&server_addr, sizeof(server_addr)) < 0)
+  {
+    throw SocketException(string("Bind connection is failed!") + strerror(errno));
+  }
 
-    logger.info("Socket Creation Successfully");
+  logger.info("Bind connection is successfully");
 
-    sockaddr_in server_addr{};
-    server_addr.sin_family = AF_INET;
-    server_addr.sin_port = htons(8080);
-    server_addr.sin_addr.s_addr=INADDR_ANY;
+  if (listen(server_fd.get(), 5) < 0)
+  {
+    throw SocketException(string("Listen failed!") + strerror(errno));
+  }
 
-    if(bind(server_fd.get() , (sockaddr*)&server_addr , sizeof(server_addr)) < 0){
-      throw SocketException(string("Bind connection is failed!")+strerror(errno));
-    }
+  logger.info("Waiting for client");
 
-    logger.info("Bind connection is successfully");
+  epollManager.addFd(server_fd.get());
+  ///
 
-    if(listen(server_fd.get() ,5) <0){
-       throw SocketException(string("Listen failed!")+strerror(errno));
-    }
-
-    logger.info("Waiting for client");
-
-    epollManager.addFd(server_fd.get());
- ///
-
-    scheduler.registerHandler(server_fd.get(),[this](epoll_event&){
+  scheduler.registerHandler(server_fd.get(), [this](epoll_event &)
+                            {
             logger.info("New Client Arrived");
 
             while(true){
@@ -181,64 +202,63 @@ void Server::start(){
           continue;
           }
 
-           connectionManager.addClient(move(client));
-
-         epollManager.addFd(client_fd);
    /////
-        scheduler.registerHandler(client_fd,[this](epoll_event& event){
+        scheduler.registerContext(client_fd,move(client),[this](epoll_event& event){
 
           handleClientEvent(event);
         }
            );
+
+         epollManager.addFd(client_fd);
+
         logger.info(string("Accepted Client FD:" )+ to_string(client_fd));
-        }
+        } });
+
+  epoll_event events[10];
+
+  while (true)
+  {
+
+    int num_events = scheduler.waitForEvents(events, 10);
+
+    if (num_events == -1)
+    {
+      throw SocketException(string("epoll_wait failed!") + strerror(errno));
     }
-    );
 
-     epoll_event events[10];
+    for (int i = 0; i < num_events; i++)
+    {
 
-    while( true){
+      cout << "FD = "<< events[i].data.fd<< " EVENTS = "<< events[i].events<< endl;
 
-      int num_events = scheduler.waitForEvents(events ,10);
+      if (events[i].events & EPOLLRDHUP)
+      {
+        logger.info("Client disconnected");
 
-    if(num_events ==-1){
-         throw SocketException(string("epoll_wait failed!")+strerror(errno));
+        disconnectClient(events[i].data.fd);
+
+        continue;
       }
 
-    for(int i = 0; i < num_events; i++){
-
-
-         if(events[i].events & EPOLLRDHUP){
-          logger.info("Client disconnected");
-
-          epollManager.removeFd(events[i].data.fd);
-
-          connectionManager.removeClient(events[i].data.fd);
-          scheduler.removeHandler(events[i].data.fd);
-          continue;
-        }
-
-         scheduler.dispatch(events[i]);
- }
-
-
-}
-
+      scheduler.dispatch(events[i]);
+    }
+  }
 }
 // this is the function for checking the socket is blcokig
 
 bool setNonBlocking(int fd)
 {
-    int flags = fcntl(fd, F_GETFL, 0);
+  int flags = fcntl(fd, F_GETFL, 0);
 
-    if(flags == -1){
-        return false;
-    }
+  if (flags == -1)
+  {
+    return false;
+  }
 
-    if(fcntl(fd, F_SETFL, flags | O_NONBLOCK) == -1){
-        return false;
-    }
+  if (fcntl(fd, F_SETFL, flags | O_NONBLOCK) == -1)
+  {
+    return false;
+  }
 
-    return true;
+  return true;
 }
-

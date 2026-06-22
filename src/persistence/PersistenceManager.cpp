@@ -3,7 +3,7 @@
 #include "PersistenceManager.h"
 #include "../database/Database.h"
 #include <fstream>
-
+#include<iostream>
 void  PersistenceManager::save(const Database& db){
 
   ofstream file("dump.rdb");  // open the file if not create yet then create it (for write )
@@ -34,7 +34,8 @@ void PersistenceManager ::load( Database& db){
    ifstream file("dump.rdb"); // open the file and read
 
    if(!file){
-     throw PersistenceException("Failed to open dump.rdb for reading");
+     cout<<"No dumb.rdb file is found and starting with empty database "<<endl;
+     return;
    }
   string line;
 

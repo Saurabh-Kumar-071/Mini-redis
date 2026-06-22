@@ -12,7 +12,6 @@ add_executable(
     src/command/CommandParser.cpp
     src/command/CommandExecutor.cpp
     src/client/ClientConnection.cpp
-    src/client/ClientManager.cpp
     src/persistence/PersistenceManager.cpp
     src/logger/ConsoleLogger.cpp
     src/logger/FileLogger.cpp

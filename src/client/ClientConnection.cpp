@@ -9,6 +9,7 @@ int ClientConnection::getFd() const{
     return fd.get();
 }
 
+
 void ClientConnection::appendToReadBuffer(const string& data){
     readBuffer += data;
 }

@@ -31,8 +31,11 @@ void Server::handleClientEvent(epoll_event &event)
       return;
 
     string &buffer = client->getWriteBuffer();
+    cout<<"Edge triggered"<<endl;
+    cout<<"write buffer size:"<<buffer.size()<<endl;
 
     int sent = send(event.data.fd, buffer.c_str(), buffer.size(), 0);
+    cout<<"Buffer size after send"<<buffer.size()<<endl;
 
     if (sent == -1)
     {
@@ -101,8 +104,11 @@ void Server::handleClientEvent(epoll_event &event)
         }
       }
 
-      if (sent < response.size())
+      if (sent < response.size())   
       {
+         cout << "PARTIAL WRITE" << endl;
+         cout << "Sent = " << sent << endl;
+         cout << "Total = " << response.size() << endl;
         client->appendToWriteBuffer(response.substr(sent));
 
         epollManager.modifyFd(event.data.fd, EPOLLIN | EPOLLET | EPOLLRDHUP | EPOLLOUT);
@@ -229,6 +235,8 @@ void Server::start()
     for (int i = 0; i < num_events; i++)
     {
 
+      scheduler.dispatch(events[i]);
+
       cout << "FD = "<< events[i].data.fd<< " EVENTS = "<< events[i].events<< endl;
 
       if (events[i].events & EPOLLRDHUP)
@@ -239,8 +247,6 @@ void Server::start()
 
         continue;
       }
-
-      scheduler.dispatch(events[i]);
     }
   }
 }

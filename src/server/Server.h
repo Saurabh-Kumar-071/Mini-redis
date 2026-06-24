@@ -32,8 +32,7 @@ public:
 
     void start();
 
-    void disconnectClient(int fd){
-        epollManager.removeFd(fd);scheduler.removeContext(fd);
-    }
+    void disconnectClient(int fd);
+
 
 };

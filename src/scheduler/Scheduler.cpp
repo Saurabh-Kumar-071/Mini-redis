@@ -46,3 +46,18 @@ void Scheduler::registerContext(int fd,std::unique_ptr<ClientConnection> client,
 void Scheduler::removeContext(int fd){
     contexts.erase(fd);
 }
+
+void Scheduler::markPeerClosed(int fd){
+    auto it = contexts.find(fd);
+    if(it != contexts.end()){
+        it->second.peerClosed = true;
+    }
+}
+
+bool Scheduler::isPeerClosed(int fd){
+    auto it = contexts.find(fd);
+    if(it == contexts.end())
+        return false;
+
+    return it->second.peerClosed;
+}

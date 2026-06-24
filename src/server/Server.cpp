@@ -26,6 +26,7 @@ void Server::handleClientEvent(epoll_event &event)
 
   if (event.events & EPOLLOUT)
   {
+      cout << "EPOLLOUT fired" << endl;
     ClientConnection *client = scheduler.getClient(event.data.fd);
     if (client == nullptr)
       return;
@@ -35,10 +36,11 @@ void Server::handleClientEvent(epoll_event &event)
     cout<<"write buffer size:"<<buffer.size()<<endl;
 
     int sent = send(event.data.fd, buffer.c_str(), buffer.size(), 0);
-    cout<<"Buffer size after send"<<buffer.size()<<endl;
+    cout << "EPOLLOUT send returned = "<< sent<< endl;
 
     if (sent == -1)
     {
+      cout << "send errno = "<< errno<< " "<< strerror(errno)<< endl;
       if (errno == EAGAIN || errno == EWOULDBLOCK)
       {
         sent = 0;
@@ -46,7 +48,8 @@ void Server::handleClientEvent(epoll_event &event)
       else
       {
         logger.error(string("send failed: ") + strerror(errno));
-        disconnectClient(event.data.fd);
+
+          disconnectClient(event.data.fd);
         return;
       }
     }
@@ -54,8 +57,13 @@ void Server::handleClientEvent(epoll_event &event)
     if (sent > 0)
     {
       buffer.erase(0, sent);
-      if (buffer.empty())
-      {
+      cout<<"Buffer size after send: "<<buffer.size()<<endl;
+      if (buffer.empty()){
+
+        if(scheduler.isPeerClosed(event.data.fd)){
+        disconnectClient(event.data.fd);
+        return;
+    }
         epollManager.modifyFd(event.data.fd, EPOLLIN | EPOLLET | EPOLLRDHUP);
       }
     }
@@ -100,11 +108,16 @@ void Server::handleClientEvent(epoll_event &event)
         else
         {
           logger.error(string("send failed: ") + strerror(errno));
-          disconnectClient(event.data.fd);
+          scheduler.markPeerClosed(event.data.fd);
+
+          if(client->getWriteBuffer().empty()){
+           disconnectClient(event.data.fd);
+          }
+
         }
       }
 
-      if (sent < response.size())   
+      if (sent < response.size())
       {
          cout << "PARTIAL WRITE" << endl;
          cout << "Sent = " << sent << endl;
@@ -120,9 +133,14 @@ void Server::handleClientEvent(epoll_event &event)
 
     else if (bytes_received == 0)
     {
-
       cout << "Client disconnect" << endl;
-      disconnectClient(event.data.fd);
+
+      scheduler.markPeerClosed(event.data.fd);
+
+      if(client->getWriteBuffer().empty()){
+        disconnectClient(event.data.fd);
+      }
+
       break;
     }
 
@@ -136,7 +154,12 @@ void Server::handleClientEvent(epoll_event &event)
       else
       {
         logger.error(string("Recv failed: ") + strerror(errno));
-        disconnectClient(event.data.fd);
+
+        scheduler.markPeerClosed(event.data.fd);
+        if(client->getWriteBuffer().empty()){
+          disconnectClient(event.data.fd);
+        }
+
       }
       break;
     }
@@ -235,18 +258,18 @@ void Server::start()
     for (int i = 0; i < num_events; i++)
     {
 
-      scheduler.dispatch(events[i]);
+
 
       cout << "FD = "<< events[i].data.fd<< " EVENTS = "<< events[i].events<< endl;
 
       if (events[i].events & EPOLLRDHUP)
       {
-        logger.info("Client disconnected");
-
-        disconnectClient(events[i].data.fd);
-
-        continue;
+        logger.info("Peer closed");
+        cout << "RDHUP received for fd " << events[i].data.fd << endl;
+        scheduler.markPeerClosed(events[i].data.fd);
       }
+
+     scheduler.dispatch(events[i]);
     }
   }
 }
@@ -267,4 +290,23 @@ bool setNonBlocking(int fd)
   }
 
   return true;
+}
+
+
+void Server::disconnectClient(int fd)
+{
+    ClientConnection* client =
+        scheduler.getClient(fd);
+
+    if(client)
+    {
+        cout << "Disconnecting fd "
+             << fd
+             << " writeBuffer size = "
+             << client->getWriteBuffer().size()
+             << endl;
+    }
+
+    epollManager.removeFd(fd);
+    scheduler.removeContext(fd);
 }

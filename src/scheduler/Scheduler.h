@@ -11,12 +11,12 @@
 struct EventContext{
     std::function<void(epoll_event&)> handler; ////handlers[fd](event);
     std::unique_ptr<ClientConnection> client;
+    bool peerClosed = false;
 };
 
 class Scheduler{
 private:
     EpollManager& epollManager;
-
     std::unordered_map<int,EventContext> contexts;
 
 public:
@@ -36,5 +36,8 @@ public:
      void dispatch(epoll_event& event);
 
      ClientConnection* getClient(int fd);
+
+     void markPeerClosed(int fd);
+     bool isPeerClosed(int fd);
 
 };

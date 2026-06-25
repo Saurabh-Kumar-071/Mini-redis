@@ -1,12 +1,11 @@
 #pragma once
 
 #include<string>
+#include<vector>
 using namespace std;
 
 struct ParsedCommand{
-     string command;
-     string key;
-     string value;
+     vector<string>arguments;
 };
 
 class CommandParser{

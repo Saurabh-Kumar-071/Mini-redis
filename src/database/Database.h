@@ -28,6 +28,8 @@ public:
 
     void setExpiryTime(const string& key,const chrono::system_clock::time_point& tp);
 
+    bool exists(const string& key);
+
     const unordered_map<string,string>& getAllData() const; //First const: Returned map cannot be modified.  Second const: Function cannot modify the Database object.
 
     const unordered_map<string,chrono::system_clock::time_point>& getAllExpiry() const;

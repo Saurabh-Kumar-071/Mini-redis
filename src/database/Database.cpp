@@ -68,6 +68,9 @@ const unordered_map<string,string>& Database::getAllData() const{
        return chrono::duration_cast<chrono::seconds>(remaining_time).count();
   }
 
+  bool Database::exists(const string& key){
+    return data.find(key) != data.end();
+}
 
   const unordered_map<string,chrono::system_clock::time_point>& Database:: getAllExpiry() const{
     return expiry;

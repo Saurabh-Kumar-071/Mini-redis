@@ -26,24 +26,27 @@ void Server::handleClientEvent(epoll_event &event)
 
   if (event.events & EPOLLOUT)
   {
-      cout << "EPOLLOUT fired" << endl;
+      // cout << "EPOLLOUT fired" << endl;
     ClientConnection *client = scheduler.getClient(event.data.fd);
     if (client == nullptr)
       return;
 
     string &buffer = client->getWriteBuffer();
-    cout<<"Edge triggered"<<endl;
-    cout<<"write buffer size:"<<buffer.size()<<endl;
+    // cout<<"Edge triggered"<<endl;
+    // cout<<"write buffer size:"<<buffer.size()<<endl;
 
-    int sent = send(event.data.fd, buffer.c_str(), buffer.size(), 0);
-    cout << "EPOLLOUT send returned = "<< sent<< endl;
+     while(!buffer.empty()){  // write drain loop
+       int sent = send(event.data.fd, buffer.c_str(), buffer.size(), 0);
+    // cout << "EPOLLOUT send returned = "<< sent<< endl;
+
+
 
     if (sent == -1)
     {
-      cout << "send errno = "<< errno<< " "<< strerror(errno)<< endl;
+      // cout << "send errno = "<< errno<< " "<< strerror(errno)<< endl;
       if (errno == EAGAIN || errno == EWOULDBLOCK)
       {
-        sent = 0;
+        break; // when the kernal is full then call again EPOLLOUT to send remaining data
       }
       else
       {
@@ -57,16 +60,20 @@ void Server::handleClientEvent(epoll_event &event)
     if (sent > 0)
     {
       buffer.erase(0, sent);
-      cout<<"Buffer size after send: "<<buffer.size()<<endl;
-      if (buffer.empty()){
+      // cout<<"Buffer size after send: "<<buffer.size()<<endl;
+    }
+     }
+
+      if (!buffer.empty()){
+          return;
+         }
 
         if(scheduler.isPeerClosed(event.data.fd)){
         disconnectClient(event.data.fd);
         return;
     }
         epollManager.modifyFd(event.data.fd, EPOLLIN | EPOLLET | EPOLLRDHUP);
-      }
-    }
+
     return;
   }
 
@@ -80,23 +87,23 @@ void Server::handleClientEvent(epoll_event &event)
   while (true)
   {
     int bytes_received = recv(event.data.fd, buffer, sizeof(buffer), 0);
-    cout << "recv returned = "<< bytes_received << endl;
+    // cout << "recv returned = "<< bytes_received << endl;
 
     if (bytes_received > 0)
     {
 
       string incoming(buffer, bytes_received);
-      cout<<"Received :"<<incoming<<endl;
+      // cout<<"Received :"<<incoming<<endl;
       client->appendToReadBuffer(incoming);
 
       ParsedCommand cmd = parser.parse(client->getReadBuffer());
-      cout<<"cmd command:"<<" ,"<<cmd.command<<"cmd key:"<<cmd.key<<" ,"<<"cmd val:"<<" "<<cmd.value<<endl;
-      if (cmd.command.empty())
+      // cout<<"cmd command:"<<" ,"<<cmd.command<<"cmd key:"<<cmd.key<<" ,"<<"cmd val:"<<" "<<cmd.value<<endl;
+      if (cmd.arguments.empty())
         continue;
 
       string response = executor.execute(cmd);
 
-      cout<<"Response:"<<response<<endl;
+      // cout<<"Response:"<<response<<endl;
       int sent = send(event.data.fd, response.c_str(), response.size(), 0);
 
       if (sent == -1)
@@ -119,13 +126,13 @@ void Server::handleClientEvent(epoll_event &event)
 
       if (sent < response.size())
       {
-         cout << "PARTIAL WRITE" << endl;
-         cout << "Sent = " << sent << endl;
-         cout << "Total = " << response.size() << endl;
+        //  cout << "PARTIAL WRITE" << endl;
+        //  cout << "Sent = " << sent << endl;
+        //  cout << "Total = " << response.size() << endl;
         client->appendToWriteBuffer(response.substr(sent));
 
         epollManager.modifyFd(event.data.fd, EPOLLIN | EPOLLET | EPOLLRDHUP | EPOLLOUT);
-        cout << "Partial write detected" << endl;
+        // cout << "Partial write detected" << endl;
       }
 
       client->clearReadBuffer();
@@ -190,7 +197,7 @@ void Server::start()
 
   if (bind(server_fd.get(), (sockaddr *)&server_addr, sizeof(server_addr)) < 0)
   {
-    throw SocketException(string("Bind connection is failed!") + strerror(errno));
+    throw SocketException(string("Bind connection is failed! :") + strerror(errno));
   }
 
   logger.info("Bind connection is successfully");
@@ -212,7 +219,6 @@ void Server::start()
             while(true){
 
              int client_fd =accept(server_fd.get(),nullptr,nullptr);
-
 
             if(client_fd == -1){
               if(errno==EAGAIN ||errno == EWOULDBLOCK){
@@ -260,12 +266,12 @@ void Server::start()
 
 
 
-      cout << "FD = "<< events[i].data.fd<< " EVENTS = "<< events[i].events<< endl;
+      // cout << "FD = "<< events[i].data.fd<< " EVENTS = "<< events[i].events<< endl;
 
       if (events[i].events & EPOLLRDHUP)
       {
         logger.info("Peer closed");
-        cout << "RDHUP received for fd " << events[i].data.fd << endl;
+        // cout << "RDHUP received for fd " << events[i].data.fd << endl;
         scheduler.markPeerClosed(events[i].data.fd);
       }
 
@@ -298,14 +304,14 @@ void Server::disconnectClient(int fd)
     ClientConnection* client =
         scheduler.getClient(fd);
 
-    if(client)
-    {
-        cout << "Disconnecting fd "
-             << fd
-             << " writeBuffer size = "
-             << client->getWriteBuffer().size()
-             << endl;
-    }
+    // if(client)
+    // {
+    //     cout << "Disconnecting fd "
+    //          << fd
+    //          << " writeBuffer size = "
+    //          << client->getWriteBuffer().size()
+    //          << endl;
+    // }
 
     epollManager.removeFd(fd);
     scheduler.removeContext(fd);

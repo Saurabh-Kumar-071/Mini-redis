@@ -1,5 +1,6 @@
 #include "Database.h"
 #include <iostream>
+#include<vector>
 using namespace std;
 
 void Database ::set( const string &key , const string& value){//::->Scope Resolution Operator means Which scope does this thing belong to?
@@ -80,3 +81,99 @@ const unordered_map<string,string>& Database::getAllData() const{
 void Database::setExpiryTime(const string&key , const chrono::system_clock::time_point& tp){
    expiry[key] = tp;
 }
+
+ vector<string> Database::keys() const{
+    vector<string> result;
+
+    for (const auto& pair : data){  //const auto& pair → uses a reference without copying.
+        result.push_back(pair.first);
+    }
+    return result;
+}
+
+void Database::clear(){  //Your Database API should describe what it does, not which Redis command called it.
+    data.clear();
+    expiry.clear();
+}
+
+bool Database::persist(const string& key) {
+    auto it = expiry.find(key);
+   if(it!=expiry.end() ){
+     expiry.erase(key);
+     return true;
+   }
+ return false;
+}
+
+ int Database::append(const string& key, const string& value){
+   data[key] += value;
+return data[key].size();
+ }
+
+  int Database::strlen(const string& key) const{
+
+   auto it = data.find(key);
+   if(it == data.end())
+       return 0;
+
+return it->second.size();
+  }
+
+
+string Database::getset(const string& key,const string& value){
+    if(data.find(key)!=data.end()){
+   string old_val = data[key];
+    set(key ,value);
+   return old_val;
+    }
+return "(nil)";
+
+}
+
+int Database::incrby(const string& key, int increment){
+
+    if (!exists(key)) {
+        set(key, to_string(increment));
+        return increment;
+    }
+
+     int value = stoi(get(key));
+    value += increment;
+    set(key, to_string(value));
+
+    return value;
+}
+
+int Database::decrby(const string& key, int decrement){
+    return incrby(key, -decrement);
+}
+
+size_t Database::size() const{
+   return data.size();
+}
+
+string Database::info() const{
+    return "MiniRedis\nKeys: " + to_string(data.size()) +"\nTTL Keys: " + to_string(expiry.size());
+}
+
+bool Database::rename(const string& oldKey,   const string& newKey){
+    auto it = data.find(oldKey);
+
+    if(it == data.end())
+        return false;
+
+    data[newKey] = it->second;
+    data.erase(it);
+
+    auto exp = expiry.find(oldKey);
+
+    if(exp != expiry.end())
+    {
+        expiry[newKey] = exp->second;
+        expiry.erase(exp);
+    }
+
+    return true;
+}
+
+

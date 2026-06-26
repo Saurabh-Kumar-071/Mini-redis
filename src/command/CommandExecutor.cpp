@@ -144,7 +144,7 @@ string CommandExecutor ::execute(const ParsedCommand& cmd){
       persistence.save(db);
       return "1";
      }
-     
+
       int value = stoi(db.get(key));
       value--;
 
@@ -156,6 +156,148 @@ string CommandExecutor ::execute(const ParsedCommand& cmd){
      return "ERR value is not an integer";
    }
  }
+
+ else if(command == "KEYS"){
+   if (cmd.arguments.size() != 1) return "ERR wrong number of arguments";
+
+   vector<string>keys  = db.keys();
+   string response="";
+   for (size_t i = 0; i < keys.size(); i++){
+    response += keys[i];
+    if (i + 1 < keys.size())
+        response += " ";
+      }
+return response;
+ }
+
+ else if(command == "FLUSHDB"){
+  if(cmd.arguments.size()!=1) return "ERR wrong number of arguments";
+
+    db.clear();
+    persistence.save(db);
+  return "OK";
+ }
+
+ else if(command == "PERSIST"){
+     if(cmd.arguments.size()!=2) return "ERR wrong number of arguments";
+
+      const string& key = cmd.arguments[1];
+     if(db.persist(key)){
+      persistence.save(db);
+      return "1";
+     }
+    return "0";
+ }
+
+ else if(command == "APPEND"){
+    if(cmd.arguments.size() != 3) return "ERR wrong number of arguments";
+
+    int len = db.append(cmd.arguments[1], cmd.arguments[2]);
+    persistence.save(db);
+    return to_string(len);
+}
+
+else if(command == "STRLEN"){
+    if(cmd.arguments.size() != 2) return "ERR wrong number of arguments";
+
+    const string&key = cmd.arguments[1];
+    return to_string(db.strlen(key));
+}
+
+else if(command =="GETSET"){
+   if(cmd.arguments.size() != 3) return "ERR wrong number of arguments";
+   const string& key = cmd.arguments[1];
+   const string& value = cmd.arguments[2];
+    string old_val = db.getset(key,value);
+   persistence.save(db);
+  return old_val;
+}
+
+else if(command == "INCRBY"){
+    if(cmd.arguments.size() != 3) return "ERR wrong number of arguments";
+
+    const string& key = cmd.arguments[1];
+
+    int increment;
+
+    try{
+        increment = stoi(cmd.arguments[2]);
+    }
+    catch(...){
+        return "ERR increment is not an integer";
+    }
+
+    try{
+        int ans = db.incrby(key, increment);
+
+        persistence.save(db);
+
+        return to_string(ans);
+    }
+    catch(...){
+        return "ERR value is not an integer";
+    }
+}
+
+else if(command == "DECRBY"){
+    if(cmd.arguments.size() != 3)   return "ERR wrong number of arguments";
+
+    const string& key = cmd.arguments[1];
+    int decrement;
+
+    try {
+        decrement = stoi(cmd.arguments[2]);
+    }
+    catch(...){
+        return "ERR decrement is not an integer";
+    }
+
+    try {
+        int ans = db.decrby(key, decrement);
+        persistence.save(db);
+        return to_string(ans);
+    }
+    catch(...){
+        return "ERR value is not an integer";
+    }
+}
+
+else if(command =="DBSIZE"){
+   if(cmd.arguments.size() != 1)  return "ERR wrong number of arguments";
+  return to_string(db.size());
+}
+
+else if(command == "TYPE"){
+    if(cmd.arguments.size() != 2)  return "ERR wrong number of arguments";
+
+    if(db.exists(cmd.arguments[1])) return "string";
+
+    return "none";
+}
+
+else if(command == "INFO"){
+    if(cmd.arguments.size() != 1)   return "ERR wrong number of arguments";
+
+    return db.info();
+}
+
+else if(command == "RENAME"){
+    if(cmd.arguments.size() != 3) return "ERR wrong number of arguments";
+
+    if(db.rename(cmd.arguments[1], cmd.arguments[2])) {
+        persistence.save(db);
+        return "OK";
+    }
+    return "ERR no such key";
+}
+
+else if(command == "ECHO"){
+    if(cmd.arguments.size() != 2) return "ERR wrong number of arguments";
+
+    return cmd.arguments[1];
+}
+
+
 
 
   return "UNKNOWN COMMMAND!";

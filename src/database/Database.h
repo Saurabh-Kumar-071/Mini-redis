@@ -5,6 +5,7 @@
 #include<unordered_set>
 #include<chrono> // for timestamps
 #include "../exception/DatabaseException.h"
+#include<vector>
 using namespace std;
 
 class Database

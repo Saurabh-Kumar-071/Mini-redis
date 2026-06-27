@@ -10,5 +10,6 @@ struct ParsedCommand{
 
 class CommandParser{
   public:
-    ParsedCommand parse( const string &input);
+    ParsedCommand parse( const string &input); // old parser for plain text
+    ParsedCommand parseRESP(const string& input); // RESP PARSER
 };

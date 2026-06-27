@@ -19,6 +19,7 @@ add_executable(
     src/network/EpollManager.cpp
     src/network/FileDescriptor.cpp
     src/scheduler/Scheduler.cpp
+    src/protocol/RESPEncoder.cpp
     src/utils/Split.cpp
 )
 

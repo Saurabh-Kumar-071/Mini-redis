@@ -8,6 +8,7 @@ using namespace std;
 
 int main(){
 
+
 try{
      FileLogger fileLogger;
      ConsoleLogger consoleLogger;

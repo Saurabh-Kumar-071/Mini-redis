@@ -1,18 +1,40 @@
 
 #include "CommandParser.h"
 #include<sstream>
+#include<iostream>
 
 using namespace std;
 
-ParsedCommand CommandParser::parse( const string &input){
+ParsedCommand CommandParser::parseRESP(const string& input){
+    ParsedCommand result;
 
-      ParsedCommand result;
-      stringstream ss(input);
-      string token;
+    stringstream ss(input);
+    string line;
 
-      while(ss >> token){
-        result.arguments.push_back(token);
-      }
+    // Read *<count>
+    getline(ss, line);
 
-  return result;
+    if (!line.empty() && line.back() == '\r')
+        line.pop_back();
+
+    int count = stoi(line.substr(1));
+
+    // Read arguments
+    for (int i = 0; i < count; i++) {
+        // Skip $<length>
+        getline(ss, line);
+
+        if (!line.empty() && line.back() == '\r')
+            line.pop_back();
+
+        // Read actual argument
+        getline(ss, line);
+
+        if (!line.empty() && line.back() == '\r')
+            line.pop_back();
+
+        result.arguments.push_back(line);
+    }
+
+    return result;
 }

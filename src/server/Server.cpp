@@ -1,5 +1,6 @@
 #include "Server.h"
 #include "../logger/ILogger.h"
+#include "../protocol/RESPEncoder.h"
 #include <iostream>
 #include <sys/socket.h> //socket()
 #include <netinet/in.h> //sockaddr_in(ip and port number)
@@ -96,15 +97,39 @@ void Server::handleClientEvent(epoll_event &event)
       // cout<<"Received :"<<incoming<<endl;
       client->appendToReadBuffer(incoming);
 
-      ParsedCommand cmd = parser.parse(client->getReadBuffer());
+      ParsedCommand cmd = parser.parseRESP(client->getReadBuffer());
       // cout<<"cmd command:"<<" ,"<<cmd.command<<"cmd key:"<<cmd.key<<" ,"<<"cmd val:"<<" "<<cmd.value<<endl;
       if (cmd.arguments.empty())
         continue;
 
-      string response = executor.execute(cmd);
+     CommandResponse response = executor.execute(cmd);
+
+     string encodedResponse;
+     switch(response.type){
+
+    case ResponseType::SimpleString:
+        encodedResponse = RESPEncoder::simpleString(response.value);
+        break;
+
+    case ResponseType::BulkString:
+        encodedResponse = RESPEncoder::bulkString(response.value);
+        break;
+
+    case ResponseType::Integer:
+        encodedResponse = RESPEncoder::integer(stoll(response.value));
+        break;
+
+    case ResponseType::Error:
+        encodedResponse = RESPEncoder::error(response.value);
+        break;
+
+    case ResponseType::Null:
+        encodedResponse = RESPEncoder::nullBulkString();
+        break;
+}
 
       // cout<<"Response:"<<response<<endl;
-      int sent = send(event.data.fd, response.c_str(), response.size(), 0);
+      int sent = send(event.data.fd, encodedResponse.c_str(), encodedResponse.size(), 0);
 
       if (sent == -1)
       {
@@ -124,12 +149,12 @@ void Server::handleClientEvent(epoll_event &event)
         }
       }
 
-      if (sent < response.size())
+      if (sent < encodedResponse.size())
       {
         //  cout << "PARTIAL WRITE" << endl;
         //  cout << "Sent = " << sent << endl;
         //  cout << "Total = " << response.size() << endl;
-        client->appendToWriteBuffer(response.substr(sent));
+        client->appendToWriteBuffer(encodedResponse.substr(sent));
 
         epollManager.modifyFd(event.data.fd, EPOLLIN | EPOLLET | EPOLLRDHUP | EPOLLOUT);
         // cout << "Partial write detected" << endl;

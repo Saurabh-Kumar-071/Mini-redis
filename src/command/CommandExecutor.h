@@ -4,7 +4,7 @@
 #include "../database/Database.h"
 #include "CommandParser.h"
 #include "../persistence/PersistenceManager.h"
-
+#include "../protocol/CommandResponse.h"
 
 using namespace std;
 
@@ -16,6 +16,6 @@ class CommandExecutor{
    public:
      CommandExecutor(Database& database , PersistenceManager& persistence);
 
-     string execute(const ParsedCommand& cmd);
+    CommandResponse execute(const ParsedCommand& cmd);
 
 };

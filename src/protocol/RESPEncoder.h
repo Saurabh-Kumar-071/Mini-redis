@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include<vector>
 
 using namespace std;
 
@@ -15,4 +16,6 @@ public:
     static string error(const string& str);
 
     static string nullBulkString();
+
+    static string array(const vector<string>& arr);
 };

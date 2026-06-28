@@ -10,10 +10,12 @@ enum class ResponseType{ // ?
     BulkString,
     Integer,
     Error,
-    Null
+    Null,
+    Array
 };
 
 struct CommandResponse{
-    ResponseType type; 
+    ResponseType type;
     string value;
+     vector<string> array;
 };

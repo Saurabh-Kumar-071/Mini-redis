@@ -17,11 +17,12 @@ string Database :: get( const string&key) {
     return "Not-found";
    }
 
-   if(data.find(key) ==data.end()){
+   auto it  = data.find(key);
+   if(it ==data.end()){
       return "not-found";
    }
 
-   return data[key];
+   return it->second;
 }
 
 void Database ::del(const  string &key){
@@ -34,17 +35,19 @@ const unordered_map<string,string>& Database::getAllData() const{
 }
 
  void Database::expire(const string& key,int seconds){
-   if(data.find(key) ==data.end()) return;
+    auto it  = data.find(key);
+    if(it ==data.end()) return;
 
     expiry[key] = chrono::system_clock::now() + chrono::seconds(seconds);
  }
 
    bool Database:: isExpired(const string& key){
 
-      if(expiry.find(key) == expiry.end()) return false;
+    auto it  = expiry.find(key);
+      if(it == expiry.end()) return false;
 
       auto now  = chrono::system_clock::now();
-      if(now >=expiry[key]) return true;
+      if(now >= it->second) return true;
       return false;
    }
 
@@ -60,11 +63,12 @@ const unordered_map<string,string>& Database::getAllData() const{
         return -2;
        }
 
-       if(expiry.find(key) == expiry.end()){
+     auto it  = expiry.find(key);
+       if(it == expiry.end()){
        return -1; //key exists but no TTL
       }
 
-      auto remaining_time = expiry[key] - chrono::system_clock::now();
+      auto remaining_time = it->second - chrono::system_clock::now();
 
        return chrono::duration_cast<chrono::seconds>(remaining_time).count();
   }
@@ -84,6 +88,7 @@ void Database::setExpiryTime(const string&key , const chrono::system_clock::time
 
  vector<string> Database::keys() const{
     vector<string> result;
+    result.reserve(data.size());
 
     for (const auto& pair : data){  //const auto& pair → uses a reference without copying.
         result.push_back(pair.first);
@@ -99,15 +104,16 @@ void Database::clear(){  //Your Database API should describe what it does, not w
 bool Database::persist(const string& key) {
     auto it = expiry.find(key);
    if(it!=expiry.end() ){
-     expiry.erase(key);
+     expiry.erase(it);
      return true;
    }
  return false;
 }
 
  int Database::append(const string& key, const string& value){
-   data[key] += value;
-return data[key].size();
+    auto& str = data[key];
+     str += value;
+return str.size();
  }
 
   int Database::strlen(const string& key) const{
@@ -121,9 +127,10 @@ return it->second.size();
 
 
 string Database::getset(const string& key,const string& value){
-    if(data.find(key)!=data.end()){
-   string old_val = data[key];
-    set(key ,value);
+    auto it  = data.find(key);
+    if(it!=data.end()){
+   string old_val = it->second;
+    it->second = value;
    return old_val;
     }
 return "(nil)";
@@ -162,7 +169,7 @@ bool Database::rename(const string& oldKey,   const string& newKey){
     if(it == data.end())
         return false;
 
-    data[newKey] = it->second;
+    data[newKey] = std::move(it->second);
     data.erase(it);
 
     auto exp = expiry.find(oldKey);

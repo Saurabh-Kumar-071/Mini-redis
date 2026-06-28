@@ -126,6 +126,9 @@ void Server::handleClientEvent(epoll_event &event)
     case ResponseType::Null:
         encodedResponse = RESPEncoder::nullBulkString();
         break;
+    case ResponseType::Array:
+        encodedResponse = RESPEncoder::array(response.array);
+        break;
 }
 
       // cout<<"Response:"<<response<<endl;

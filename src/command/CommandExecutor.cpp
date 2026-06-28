@@ -85,17 +85,14 @@ CommandResponse CommandExecutor::execute(const ParsedCommand& cmd){
       return {ResponseType::Integer, to_string(db.exists(key) ? 1 : 0)};
   }
 
-  if(command == "MGET"){
+  else if(command == "MGET"){
     if(cmd.arguments.size() < 2) return {ResponseType::Error, "ERR wrong number of arguments"};;
 
-    string result;
+    vector<string> result;
     for(size_t i = 1; i < cmd.arguments.size(); i++){
-        result += db.get(cmd.arguments[i]);
-
-        if(i + 1 < cmd.arguments.size())
-            result += " ";
+        result.push_back(db.get(cmd.arguments[i]));
     }
-    return {ResponseType::BulkString, result};
+   return {ResponseType::Array, "", result};
 }
 
  else if(command=="MDEL"){
@@ -161,13 +158,7 @@ CommandResponse CommandExecutor::execute(const ParsedCommand& cmd){
    if (cmd.arguments.size() != 1) return {ResponseType::Error, "ERR wrong number of arguments"};;
 
    vector<string>keys  = db.keys();
-   string response="";
-   for (size_t i = 0; i < keys.size(); i++){
-    response += keys[i];
-    if (i + 1 < keys.size())
-        response += " ";
-      }
-return {ResponseType::BulkString, response};
+   return {ResponseType::Array, "", keys};
  }
 
  else if(command == "FLUSHDB"){

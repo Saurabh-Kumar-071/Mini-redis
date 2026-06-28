@@ -23,3 +23,17 @@ string RESPEncoder::nullBulkString(){
     return "$-1\r\n";
 }
 
+string RESPEncoder::array(const vector<string>& arr){
+    string resp = "*" + to_string(arr.size()) + "\r\n";
+
+    for (const auto& item : arr){
+        if (item == "Not-found") {
+            resp += "$-1\r\n";
+        }
+        else{
+            resp += "$" + to_string(item.size()) + "\r\n";
+            resp += item + "\r\n";
+        }
+    }
+    return resp;
+}

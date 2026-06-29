@@ -20,4 +20,6 @@ public:
     FileDescriptor& operator=(FileDescriptor&& other) noexcept;
 
     int get() const;
+
+    void reset(int newFd);//But suppose later you want to recreate the timer. and reset() automatically closes the old FD first.
 };

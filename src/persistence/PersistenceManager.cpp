@@ -72,3 +72,15 @@ void PersistenceManager ::load( Database& db){
     }
   }
 }
+
+void PersistenceManager::markDirty(){
+    dirty = true;
+}
+
+void PersistenceManager::saveIfDirty(const Database& db){
+    if (!dirty)
+        return;
+
+    save(db);
+    dirty = false;
+}

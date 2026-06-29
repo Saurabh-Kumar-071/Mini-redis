@@ -5,6 +5,7 @@
 class EpollManager{
 private:
     FileDescriptor epoll_fd;
+    FileDescriptor timer_fd;
 public:
     EpollManager();
 
@@ -14,4 +15,6 @@ public:
 
     int wait(epoll_event events[],int maxEvents);
 
+    int getTimerFd() const;
+    void createTimer();
 };

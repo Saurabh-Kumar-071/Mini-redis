@@ -4,16 +4,16 @@
 #include <iostream>
 #include <sys/socket.h> //socket()
 #include <netinet/in.h> //sockaddr_in(ip and port number)
-#include <unistd.h>     //close()
-#include <cstring>
+#include <unistd.h>     //close() and read()
+#include <cstring> // memset() to initialize the timer structure
 #include <thread>
 #include <cerrno>
 #include <fcntl.h>
+#include <sys/timerfd.h> // timerfd
 #include <sstream>
 using namespace std;
 // ----------------member initializer list.----------------------------------//
-Server::Server(ILogger &logger) : logger(logger), executor(db, persistence), server_fd(-1), scheduler(epollManager)
-{
+Server::Server(ILogger &logger) : logger(logger), executor(db, persistence), server_fd(-1), scheduler(epollManager){
   persistence.load(db); //[ Construct executor    //[Create FileDescriptor  //[Give Scheduler a reference
                         // using this Server's db   //containing invalid fd.]  //to Server's epollManager.]
                         // and persistence objects.]
@@ -238,6 +238,21 @@ void Server::start()
   logger.info("Waiting for client");
 
   epollManager.addFd(server_fd.get());
+  epollManager.createTimer();         // for creating timer
+  epollManager.addFd(epollManager.getTimerFd());
+
+ scheduler.registerHandler(epollManager.getTimerFd(), [this](epoll_event&) {
+        uint64_t expirations; //How many timer expirations happened
+
+        ssize_t bytes = read(epollManager.getTimerFd(),&expirations,sizeof(expirations));
+
+       if (bytes != sizeof(expirations)){
+        logger.error("Failed to read timerfd");
+        return;
+    }
+        persistence.saveIfDirty(db);
+    }
+);
   ///
 
   scheduler.registerHandler(server_fd.get(), [this](epoll_event &)

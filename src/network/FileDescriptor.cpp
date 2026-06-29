@@ -33,3 +33,10 @@ FileDescriptor& FileDescriptor::operator=(FileDescriptor&& other) noexcept{ // m
 }
 
 
+void FileDescriptor::reset(int newFd){
+    if(fd != -1){
+        close(fd);
+    }
+
+    fd = newFd;
+}

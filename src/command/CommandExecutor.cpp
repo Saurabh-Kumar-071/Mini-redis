@@ -23,7 +23,7 @@ CommandResponse CommandExecutor::execute(const ParsedCommand& cmd){
     const string& key = cmd.arguments[1];
     const string& value = cmd.arguments[2];
      db.set(key , value);
-     persistence.save(db);
+     persistence.markDirty();
      return {ResponseType::SimpleString, "OK"};
   }
 
@@ -39,7 +39,7 @@ CommandResponse CommandExecutor::execute(const ParsedCommand& cmd){
 
     const string& key = cmd.arguments[1];
     db.del(key);
-    persistence.save(db);
+    persistence.markDirty();
    return {ResponseType::SimpleString, "delete from database!"};
   }
 
@@ -50,7 +50,7 @@ CommandResponse CommandExecutor::execute(const ParsedCommand& cmd){
     const string& value = cmd.arguments[2];
     int val = stoi(value);
     db.expire(key ,val);
-    persistence.save(db);
+    persistence.markDirty();
     return {ResponseType::SimpleString, "ok"};
   }
 
@@ -75,7 +75,7 @@ CommandResponse CommandExecutor::execute(const ParsedCommand& cmd){
 
       db.set(key ,val);
     }
-     persistence.save(db);
+     persistence.markDirty();
      return {ResponseType::SimpleString, "ok"};
   }
 
@@ -105,7 +105,7 @@ CommandResponse CommandExecutor::execute(const ParsedCommand& cmd){
          deleted++;
        }
     }
-    persistence.save(db);
+    persistence.markDirty();
    return {ResponseType::Integer, to_string(deleted)};
  }
 
@@ -115,7 +115,7 @@ CommandResponse CommandExecutor::execute(const ParsedCommand& cmd){
     try{
       if (!db.exists(key)){
        db.set(key, "1");
-       persistence.save(db);
+       persistence.markDirty();
       return {ResponseType::Integer, to_string(1)};
       }
 
@@ -123,7 +123,7 @@ CommandResponse CommandExecutor::execute(const ParsedCommand& cmd){
       value++;
 
       db.set(key , to_string(value));
-      persistence.save(db);
+      persistence.markDirty();
 
     return {ResponseType::Integer, to_string(value)};
     }
@@ -138,7 +138,7 @@ CommandResponse CommandExecutor::execute(const ParsedCommand& cmd){
    try{
       if (!db.exists(key)){
       db.set(key, "1");
-      persistence.save(db);
+      persistence.markDirty();
      return {ResponseType::Integer, to_string(1)};
      }
 
@@ -146,7 +146,7 @@ CommandResponse CommandExecutor::execute(const ParsedCommand& cmd){
       value--;
 
       db.set(key ,to_string(value));
-      persistence.save(db);
+      persistence.markDirty();
    return {ResponseType::Integer, to_string(value)};
    }
    catch(const invalid_argument&){
@@ -165,7 +165,7 @@ CommandResponse CommandExecutor::execute(const ParsedCommand& cmd){
   if(cmd.arguments.size()!=1) return {ResponseType::Error, "ERR wrong number of arguments"};;
 
     db.clear();
-    persistence.save(db);
+    persistence.markDirty();
   return {ResponseType::SimpleString, "ok"};
  }
 
@@ -174,7 +174,7 @@ CommandResponse CommandExecutor::execute(const ParsedCommand& cmd){
 
       const string& key = cmd.arguments[1];
      if(db.persist(key)){
-      persistence.save(db);
+      persistence.markDirty();
       return {ResponseType::Integer, to_string(1)};
      }
     return {ResponseType::Integer, to_string(0)};
@@ -184,7 +184,7 @@ CommandResponse CommandExecutor::execute(const ParsedCommand& cmd){
     if(cmd.arguments.size() != 3) return {ResponseType::Error, "ERR wrong number of arguments"};;
 
     int len = db.append(cmd.arguments[1], cmd.arguments[2]);
-    persistence.save(db);
+    persistence.markDirty();
    return {ResponseType::Integer, to_string(len)};
 }
 
@@ -200,7 +200,7 @@ else if(command =="GETSET"){
    const string& key = cmd.arguments[1];
    const string& value = cmd.arguments[2];
     string old_val = db.getset(key,value);
-   persistence.save(db);
+   persistence.markDirty();
   return {ResponseType::BulkString, old_val};
 }
 
@@ -221,7 +221,7 @@ else if(command == "INCRBY"){
     try{
         int ans = db.incrby(key, increment);
 
-        persistence.save(db);
+        persistence.markDirty();
 
         return {ResponseType::Integer, to_string(ans)};
     }
@@ -245,7 +245,7 @@ else if(command == "DECRBY"){
 
     try {
         int ans = db.decrby(key, decrement);
-        persistence.save(db);
+        persistence.markDirty();
        return {ResponseType::Integer, to_string(ans)};
     }
     catch(...){
@@ -276,7 +276,7 @@ else if(command == "RENAME"){
     if(cmd.arguments.size() != 3) return {ResponseType::Error, "ERR wrong number of arguments"};;
 
     if(db.rename(cmd.arguments[1], cmd.arguments[2])) {
-        persistence.save(db);
+        persistence.markDirty();
         return {ResponseType::SimpleString, "ok"};
     }
     return {ResponseType::Error, "ERR no such key"};

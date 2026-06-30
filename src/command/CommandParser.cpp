@@ -5,36 +5,69 @@
 
 using namespace std;
 
-ParsedCommand CommandParser::parseRESP(const string& input){
-    ParsedCommand result;
+ParseResult CommandParser::parseRESP(const string& input){
+    ParseResult result;
 
-    stringstream ss(input);
-    string line;
+    size_t pos = 0;
+    // ---------- Inline protocol ----------
+if (!input.empty() && input[0] != '*'){
+    size_t end = input.find("\r\n");
 
+    if (end == string::npos)
+        return result;
+
+    stringstream ss(input.substr(0, end));
+    string word;
+
+    while (ss >> word)
+        result.command.arguments.push_back(word);
+
+    result.complete = true;
+    result.bytesConsumed = end + 2;
+
+    return result;
+}
+
+
+ /*  RESP protocol*/
     // Read *<count>
-    getline(ss, line);
+   if (pos >= input.size() || input[pos] != '*'){
+    return result;
+}
+  size_t lineEnd = input.find("\r\n", pos);
 
-    if (!line.empty() && line.back() == '\r')
-        line.pop_back();
+  if (lineEnd == string::npos){
+    return result;
+}
 
-    int count = stoi(line.substr(1));
+   int count = stoi(input.substr(pos + 1, lineEnd - pos - 1));
+   pos = lineEnd + 2;
 
     // Read arguments
     for (int i = 0; i < count; i++) {
-        // Skip $<length>
-        getline(ss, line);
 
-        if (!line.empty() && line.back() == '\r')
-            line.pop_back();
-
-        // Read actual argument
-        getline(ss, line);
-
-        if (!line.empty() && line.back() == '\r')
-            line.pop_back();
-
-        result.arguments.push_back(line);
+    if (pos >= input.size() || input[pos] != '$'){
+    return result;
     }
 
+    size_t lengthEnd = input.find("\r\n", pos);
+    if (lengthEnd == string::npos){
+    return result;
+}
+
+    int length = stoi( input.substr(pos + 1, lengthEnd - pos - 1));
+    pos = lengthEnd + 2;
+
+    if (pos + length + 2 > input.size()){
+    return result;
+}
+
+  string arg = input.substr(pos, length);
+  result.command.arguments.push_back(arg);
+  pos += length + 2;
+    }
+
+    result.complete = true;
+   result.bytesConsumed = pos;
     return result;
 }

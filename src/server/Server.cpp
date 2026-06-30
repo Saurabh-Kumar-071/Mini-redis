@@ -97,12 +97,14 @@ void Server::handleClientEvent(epoll_event &event)
       // cout<<"Received :"<<incoming<<endl;
       client->appendToReadBuffer(incoming);
 
-      ParsedCommand cmd = parser.parseRESP(client->getReadBuffer());
+      while(true){
+      ParseResult result = parser.parseRESP(client->getReadBuffer());
       // cout<<"cmd command:"<<" ,"<<cmd.command<<"cmd key:"<<cmd.key<<" ,"<<"cmd val:"<<" "<<cmd.value<<endl;
-      if (cmd.arguments.empty())
-        continue;
+      if(!result.complete)break;
 
-     CommandResponse response = executor.execute(cmd);
+      if (result.command.arguments.empty())break;
+
+     CommandResponse response = executor.execute(result.command);
 
      string encodedResponse;
      switch(response.type){
@@ -163,8 +165,9 @@ void Server::handleClientEvent(epoll_event &event)
         // cout << "Partial write detected" << endl;
       }
 
-      client->clearReadBuffer();
+     client->consumeReadBuffer(result.bytesConsumed);
     }
+  }
 
     else if (bytes_received == 0)
     {
@@ -250,6 +253,9 @@ void Server::start()
         logger.error("Failed to read timerfd");
         return;
     }
+         if(db.cleanupExpiredKeys()){ //Active Expiration.
+           persistence.markDirty();
+         }
         persistence.saveIfDirty(db);
     }
 );

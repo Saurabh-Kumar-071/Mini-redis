@@ -288,6 +288,10 @@ else if(command == "ECHO"){
     return {ResponseType::SimpleString, cmd.arguments[1]};
 }
 
+else if(command == "CONFIG"){
+    return {ResponseType::Array, "", {}};
+}
+
 
   return  {ResponseType::SimpleString, "unknown command!"};
 

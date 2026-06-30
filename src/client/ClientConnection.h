@@ -19,10 +19,10 @@ public:
 
     void appendToReadBuffer(const string& data);
 
-    void clearReadBuffer();
-
     void appendToWriteBuffer(const string& data);
 
     void clearWriteBuffer();
+
+    void consumeReadBuffer(size_t bytes);
 
 };

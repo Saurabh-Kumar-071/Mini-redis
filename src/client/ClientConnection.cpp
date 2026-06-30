@@ -14,10 +14,6 @@ void ClientConnection::appendToReadBuffer(const string& data){
     readBuffer += data;
 }
 
-void ClientConnection::clearReadBuffer(){
-  readBuffer.clear();
-}
-
 string& ClientConnection::getReadBuffer(){
   return readBuffer;
 }
@@ -32,4 +28,8 @@ void ClientConnection::clearWriteBuffer(){
 
 string& ClientConnection::getWriteBuffer(){
   return writeBuffer;
+}
+
+void ClientConnection::consumeReadBuffer(size_t bytes){
+    readBuffer.erase(0, bytes);
 }

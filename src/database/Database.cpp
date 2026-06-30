@@ -183,4 +183,20 @@ bool Database::rename(const string& oldKey,   const string& newKey){
     return true;
 }
 
+bool Database::cleanupExpiredKeys(){
+    bool changed = false;
+    auto it = expiry.begin();
+    while (it != expiry.end()){
+        if (chrono::system_clock::now() >= it->second) {
+           data.erase(it->first);
+           it = expiry.erase(it);  // it return to the next element
+           changed = true;
+        }
+        else{
+            ++it;
+        }
+    }
+ return changed;
+}
+
 

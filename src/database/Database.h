@@ -54,6 +54,8 @@ public:
 
     bool rename(const string& oldKey, const string& newKey);
 
+    bool cleanupExpiredKeys();
+
     const unordered_map<string,string>& getAllData() const; //First const: Returned map cannot be modified.  Second const: Function cannot modify the Database object.
 
     const unordered_map<string,chrono::system_clock::time_point>& getAllExpiry() const;

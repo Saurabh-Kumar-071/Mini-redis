@@ -55,7 +55,7 @@ CommandResponse CommandExecutor::execute(const ParsedCommand& cmd){
   }
 
   else if(command=="TTL"){
-     if (cmd.arguments.size() != 2) return {ResponseType::Error, "ERR wrong number of arguments"};;
+     if (cmd.arguments.size() != 2) return {ResponseType::Error, "ERR wrong number of arguments"};
 
     const string& key = cmd.arguments[1];
    return {ResponseType::Integer, to_string(db.ttl(key))};

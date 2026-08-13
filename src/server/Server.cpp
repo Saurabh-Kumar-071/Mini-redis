@@ -107,9 +107,9 @@ void Server::handleClientEvent(epoll_event &event)
      CommandResponse response = executor.execute(result.command);
 
      cout << "Command = ";
-   for (auto &arg : result.command.arguments)
+     for (auto &arg : result.command.arguments)
     cout << "[" << arg << "] ";
-cout << endl;
+    cout << endl;
 
      string encodedResponse;
      switch(response.type){

@@ -3,7 +3,7 @@
 #include <unistd.h>
 
 ClientConnection::ClientConnection(int fd, bool startAuthenticated)
-    : fd(fd), authenticated(startAuthenticated){
+    : fd(fd), authenticated(startAuthenticated), currentUsername("") {
 }
 
 int ClientConnection::getFd() const{
@@ -41,4 +41,12 @@ bool ClientConnection::isAuthenticated() const {
 
 void ClientConnection::setAuthenticated(bool value) {
     authenticated = value;
+}
+
+const string& ClientConnection::getCurrentUsername() const {
+    return currentUsername;
+}
+
+void ClientConnection::setCurrentUsername(const string& username) {
+    currentUsername = username;
 }

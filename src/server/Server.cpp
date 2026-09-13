@@ -30,11 +30,11 @@ Server::Server(ILogger &logger)
     persistence.load(db);
     // Load password from environment variable MINIREDIS_PASSWORD
     executor.loadPasswordFromEnv();
-    // Show auth status on startup
+    // Show ACL / auth status on startup
     if (executor.hasPassword()) {
-        logger.info("Authentication ENABLED (password loaded from MINIREDIS_PASSWORD)");
+        logger.info("ACL ENABLED — default user loaded from MINIREDIS_PASSWORD. Use AUTH <user> <pass> or AUTH <pass>.");
     } else {
-        logger.info("[WARN] Authentication DISABLED — set MINIREDIS_PASSWORD env var to require a password");
+        logger.info("[WARN] ACL DISABLED — set MINIREDIS_PASSWORD env var or use ACL SETUSER to require authentication.");
     }
 }
 

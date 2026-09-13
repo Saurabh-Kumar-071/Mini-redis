@@ -3,19 +3,223 @@
 #include <algorithm>
 #include <cctype>
 #include <cstdlib>
+#include <set>
 
 using namespace std;
+
+// ---------------------------------------------------------------------------
+// Constructor
+// ---------------------------------------------------------------------------
 
 CommandExecutor::CommandExecutor(Database& database, PersistenceManager& persistence)
     : db(database), persistence(persistence) {
 }
 
+// ---------------------------------------------------------------------------
+// Load default user from environment (backward-compatible with old single password)
+// ---------------------------------------------------------------------------
+
 void CommandExecutor::loadPasswordFromEnv() {
-    const char* pwd = getenv("MINIREDIS_PASSWORD");
-    if (pwd && pwd[0] != '\0') {
-        serverPassword = string(pwd);
-    }
+    aclManager.loadDefaultFromEnv();
 }
+
+// ---------------------------------------------------------------------------
+// Helper: extract the primary key from a key-based command
+// ---------------------------------------------------------------------------
+
+string CommandExecutor::getPrimaryKey(const string& command, const ParsedCommand& cmd) const {
+    static const set<string> keyCommands = {
+        "GET", "SET", "DEL", "EXPIRE", "TTL", "PERSIST", "APPEND",
+        "STRLEN", "GETSET", "INCRBY", "DECRBY", "INCR", "DECR",
+        "TYPE", "RENAME", "EXISTS", "MGET", "MSET", "MDEL"
+    };
+    if (keyCommands.count(command) == 0) return "";
+    if (cmd.arguments.size() < 2)       return "";
+    return cmd.arguments[1];
+}
+
+// ---------------------------------------------------------------------------
+// ACL subcommand handler
+// ---------------------------------------------------------------------------
+
+CommandResponse CommandExecutor::handleAclCommand(const ParsedCommand& cmd, ClientConnection& client) {
+    if (cmd.arguments.size() < 2) {
+        return {ResponseType::Error, "ERR wrong number of arguments for 'acl' command"};
+    }
+
+    string subcmd = cmd.arguments[1];
+    for (char& c : subcmd) c = toupper(static_cast<unsigned char>(c));
+
+    // ── ACL WHOAMI ────────────────────────────────────────────────────────
+    if (subcmd == "WHOAMI") {
+        string username = client.getCurrentUsername();
+        if (username.empty()) username = "default";
+        return {ResponseType::BulkString, username};
+    }
+
+    // ── ACL LIST ──────────────────────────────────────────────────────────
+    if (subcmd == "LIST") {
+        vector<string> usernames = aclManager.listUsers();
+        vector<string> result;
+        for (const string& uname : usernames) {
+            const AclUser* u = aclManager.getUser(uname);
+            if (!u) continue;
+            string line = "user " + u->username;
+            line += u->enabled ? " on" : " off";
+            line += " >";
+            line += u->password.empty() ? "(nopass)" : "***";
+            if (u->allCommands) {
+                line += " +@all";
+            } else {
+                for (const string& c : u->allowedCommands) {
+                    line += " +" + c;
+                }
+            }
+            line += " ~" + u->keyPattern;
+            result.push_back(line);
+        }
+        return {ResponseType::Array, "", result};
+    }
+
+    // ── ACL SETUSER <username> [flags...] ─────────────────────────────────
+    if (subcmd == "SETUSER") {
+        if (cmd.arguments.size() < 3) {
+            return {ResponseType::Error, "ERR wrong number of arguments for 'acl|setuser' command"};
+        }
+
+        // Only users with full access (allCommands) can manage other users
+        const string& caller = client.getCurrentUsername();
+        if (!caller.empty()) {
+            const AclUser* callerUser = aclManager.getUser(caller);
+            if (callerUser && !callerUser->allCommands) {
+                return {ResponseType::Error,
+                        "NOPERM this user has no permissions to run the 'acl|setuser' command"};
+            }
+        }
+
+        const string& username = cmd.arguments[2];
+
+        // Start from existing user values (or defaults for a new user)
+        AclUser* existing  = aclManager.getUser(username);
+        string password    = existing ? existing->password       : "";
+        bool allCmds       = existing ? existing->allCommands    : false;
+        set<string> allowed = existing ? existing->allowedCommands : set<string>{};
+        string keyPattern  = existing ? existing->keyPattern     : "*";
+        bool enabled       = existing ? existing->enabled        : true;
+
+        // Parse rule tokens
+        for (size_t i = 3; i < cmd.arguments.size(); i++) {
+            const string& token = cmd.arguments[i];
+
+            if (token[0] == '>') {
+                // >password — set the password
+                password = token.substr(1);
+
+            } else if (token == "on") {
+                enabled = true;
+
+            } else if (token == "off") {
+                enabled = false;
+
+            } else if (token == "allcommands") {
+                allCmds = true;
+
+            } else if (token == "nocommands") {
+                allCmds = false;
+                allowed.clear();
+
+            } else if (token == "allkeys" || token == "~*") {
+                keyPattern = "*";
+
+            } else if (token == "resetkeys") {
+                keyPattern = "";
+
+            } else if (token == "reset") {
+                // Reset to safe defaults
+                password   = "";
+                allCmds    = false;
+                allowed.clear();
+                keyPattern = "*";
+                enabled    = true;
+
+            } else if (token[0] == '+') {
+                // +COMMAND — whitelist a specific command
+                string cmdName = token.substr(1);
+                for (char& c : cmdName) c = toupper(static_cast<unsigned char>(c));
+                allowed.insert(cmdName);
+
+            } else if (token[0] == '-') {
+                // -COMMAND — remove a command from whitelist
+                string cmdName = token.substr(1);
+                for (char& c : cmdName) c = toupper(static_cast<unsigned char>(c));
+                allowed.erase(cmdName);
+
+            } else if (token[0] == '~') {
+                // ~pattern — set key pattern
+                keyPattern = token.substr(1);
+            }
+        }
+
+        aclManager.addUser(username, password, allCmds, allowed, keyPattern);
+        AclUser* u = aclManager.getUser(username);
+        if (u) u->enabled = enabled;
+
+        return {ResponseType::SimpleString, "OK"};
+    }
+
+    // ── ACL DELUSER <username> ────────────────────────────────────────────
+    if (subcmd == "DELUSER") {
+        if (cmd.arguments.size() < 3) {
+            return {ResponseType::Error, "ERR wrong number of arguments for 'acl|deluser' command"};
+        }
+
+        const string& caller = client.getCurrentUsername();
+        if (!caller.empty()) {
+            const AclUser* callerUser = aclManager.getUser(caller);
+            if (callerUser && !callerUser->allCommands) {
+                return {ResponseType::Error,
+                        "NOPERM this user has no permissions to run the 'acl|deluser' command"};
+            }
+        }
+
+        const string& username = cmd.arguments[2];
+        if (username == "default") {
+            return {ResponseType::Error, "ERR The 'default' user cannot be removed"};
+        }
+        bool deleted = aclManager.deleteUser(username);
+        return {ResponseType::Integer, deleted ? "1" : "0"};
+    }
+
+    // ── ACL GETUSER <username> ────────────────────────────────────────────
+    if (subcmd == "GETUSER") {
+        if (cmd.arguments.size() < 3) {
+            return {ResponseType::Error, "ERR wrong number of arguments for 'acl|getuser' command"};
+        }
+        const string& username = cmd.arguments[2];
+        const AclUser* u = aclManager.getUser(username);
+        if (!u) {
+            return {ResponseType::Null, ""};
+        }
+        string info = "username:" + u->username;
+        info += " enabled:" + string(u->enabled ? "yes" : "no");
+        info += " allcommands:" + string(u->allCommands ? "yes" : "no");
+        if (!u->allCommands) {
+            info += " commands:";
+            for (const auto& c : u->allowedCommands) {
+                info += "+" + c + " ";
+            }
+        }
+        info += " keys:~" + u->keyPattern;
+        return {ResponseType::BulkString, info};
+    }
+
+    return {ResponseType::Error,
+            "ERR unknown subcommand '" + cmd.arguments[1] + "' for 'acl' command"};
+}
+
+// ---------------------------------------------------------------------------
+// Main execute
+// ---------------------------------------------------------------------------
 
 CommandResponse CommandExecutor::execute(const ParsedCommand& cmd, ClientConnection& client){
     if(cmd.arguments.empty()) {
@@ -32,25 +236,68 @@ CommandResponse CommandExecutor::execute(const ParsedCommand& cmd, ClientConnect
         c = toupper(static_cast<unsigned char>(c));
     }
 
-    // AUTH command — always allowed even if not yet authenticated
+    // ── AUTH — always allowed (client must authenticate before anything else) ──
     if (command == "AUTH") {
-        if (cmd.arguments.size() != 2) {
+        if (!aclManager.hasUsers()) {
+            return {ResponseType::Error,
+                    "ERR Client sent AUTH, but no password is set. Did you mean ACL SETUSER with >password?"};
+        }
+        if (cmd.arguments.size() == 2) {
+            // AUTH <password>  →  authenticate as "default" user (backward compat)
+            AclUser* user = aclManager.authenticate("default", cmd.arguments[1]);
+            if (!user) {
+                return {ResponseType::Error,
+                        "WRONGPASS invalid username-password pair or user is disabled."};
+            }
+            client.setAuthenticated(true);
+            client.setCurrentUsername("default");
+            return {ResponseType::SimpleString, "OK"};
+
+        } else if (cmd.arguments.size() == 3) {
+            // AUTH <username> <password>
+            AclUser* user = aclManager.authenticate(cmd.arguments[1], cmd.arguments[2]);
+            if (!user) {
+                return {ResponseType::Error,
+                        "WRONGPASS invalid username-password pair or user is disabled."};
+            }
+            client.setAuthenticated(true);
+            client.setCurrentUsername(cmd.arguments[1]);
+            return {ResponseType::SimpleString, "OK"};
+
+        } else {
             return {ResponseType::Error, "ERR wrong number of arguments for 'auth' command"};
         }
-        if (serverPassword.empty()) {
-            return {ResponseType::Error, "ERR Client sent AUTH, but no password is set. Did you mean ACL SETUSER with >password?"};
-        }
-        if (cmd.arguments[1] == serverPassword) {
-            client.setAuthenticated(true);
-            return {ResponseType::SimpleString, "OK"};
-        }
-        return {ResponseType::Error, "WRONGPASS invalid username-password pair or user is disabled."};
     }
 
-    // Block all other commands if password is set and client not yet authenticated
-    if (!serverPassword.empty() && !client.isAuthenticated()) {
-        return {ResponseType::Error, "NOAUTH Authentication required. Please run AUTH <password>"};
+    // ── NOAUTH — block unauthenticated clients when users are registered ──
+    if (aclManager.hasUsers() && !client.isAuthenticated()) {
+        return {ResponseType::Error,
+                "NOAUTH Authentication required. Please run AUTH <username> <password>"};
     }
+
+    // ── ACL — handle ACL management commands ──────────────────────────────
+    if (command == "ACL") {
+        return handleAclCommand(cmd, client);
+    }
+
+    // ── Permission checks for authenticated named users ───────────────────
+    const string& currentUser = client.getCurrentUsername();
+    if (!currentUser.empty()) {
+        // 1. Command permission
+        if (!aclManager.canRunCommand(currentUser, command)) {
+            return {ResponseType::Error,
+                    "NOPERM this user has no permissions to run the '" +
+                    cmd.arguments[0] + "' command"};
+        }
+        // 2. Key permission (only for commands that operate on keys)
+        string primaryKey = getPrimaryKey(command, cmd);
+        if (!primaryKey.empty() && !aclManager.canAccessKey(currentUser, primaryKey)) {
+            return {ResponseType::Error,
+                    "NOPERM No permissions to access key '" + primaryKey + "'"};
+        }
+    }
+
+    // ── Command handlers ──────────────────────────────────────────────────
 
     if(command == "PING"){
         if (cmd.arguments.size() == 1) {

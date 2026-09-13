@@ -21,6 +21,7 @@ add_executable(
     src/scheduler/Scheduler.cpp
     src/protocol/RESPEncoder.cpp
     src/utils/Split.cpp
+    src/acl/AclManager.cpp
 )
 
 add_executable(
@@ -36,6 +37,7 @@ add_executable(
     src/scheduler/Scheduler.cpp
     src/protocol/RESPEncoder.cpp
     src/utils/Split.cpp
+    src/acl/AclManager.cpp
 )
 
 target_link_libraries(

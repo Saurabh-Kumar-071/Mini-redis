@@ -27,7 +27,7 @@ string RESPEncoder::array(const vector<string>& arr){
     string resp = "*" + to_string(arr.size()) + "\r\n";
 
     for (const auto& item : arr){
-        if (item == "Not-found") {
+        if (item == "$-1" || item == "Not-found" || item == "\0\0NULL\0\0") {
             resp += "$-1\r\n";
         }
         else{

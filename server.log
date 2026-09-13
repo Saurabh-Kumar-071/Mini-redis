@@ -1,3 +1,7 @@
 [INFO]Socket Creation Successfully
 [INFO]Bind connection is successfully
-[INFO]Waiting for client
+[INFO]Server listening on port 8080. Waiting for clients...
+[INFO]Accepted Client FD: 7
+[INFO]Accepted Client FD: 8
+[INFO]Graceful shutdown: persisting database snapshot to dump.rdb...
+[INFO]Server shutdown cleanly.

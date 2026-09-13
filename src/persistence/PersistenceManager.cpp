@@ -58,17 +58,19 @@ void PersistenceManager ::load( Database& db){
        string value = valuePart.substr(0,ttlpos);
        string timestampStr = valuePart.substr(ttlpos+1);
 
-       time_t timestamp = stoll(timestampStr);
+       try {
+           time_t timestamp = stoll(timestampStr);
+           auto expiryTime = chrono::system_clock::from_time_t(timestamp);
 
-      auto expiryTime = chrono::system_clock::from_time_t(timestamp);
+           if(expiryTime <= chrono::system_clock::now()){
+               continue;
+           }
 
-      if(expiryTime <=chrono::system_clock::now()){
-          continue;
-         }
-
-      db.set(key,value);
-
-      db.setExpiryTime(key,expiryTime);
+           db.set(key, value);
+           db.setExpiryTime(key, expiryTime);
+       } catch (...) {
+           db.set(key, value);
+       }
     }
   }
 }

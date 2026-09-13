@@ -7,32 +7,34 @@
 #include "../exception/SocketException.h"
 #include "../network/FileDescriptor.h"
 
+#include <atomic>
+
 class ILogger;
 
 class Server
 {
 private:
-
     void handleClientEvent(epoll_event& event);
 
-    EpollManager epollManager;        //Construct epollManager
-    Database db;                      //Construct db
-    CommandParser parser;             //Construct parser
-    PersistenceManager persistence;   //construct peristance
-    CommandExecutor executor;         // construct executor(db , persistance)
-    FileDescriptor server_fd;            // construct server_fd(-1)
-    Scheduler scheduler;                //construct schedular(epollManager)
-    ILogger& logger;                    //Store logger reference
-                                             // after above doing then Run persistence.load(db) then start server ready
+    EpollManager epollManager;
+    Database db;
+    CommandParser parser;
+    PersistenceManager persistence;
+    CommandExecutor executor;
+    FileDescriptor server_fd;
+    Scheduler scheduler;
+    ILogger& logger;
+
+    static std::atomic<bool> running;
+    static void signalHandler(int signum);
+
 public:
-    Server(ILogger& logger); //A constructor exists. It takes ILogger& as parameter.But it does not tell how it works.
+    Server(ILogger& logger);
 
     Server(const Server&) = delete;
     Server& operator=(const Server&) = delete;
 
     void start();
-
+    void stop();
     void disconnectClient(int fd);
-
-
 };

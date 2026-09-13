@@ -20,9 +20,9 @@ public:
 
     string get(const string& key);
 
-    void del(const string& key);
+    bool del(const string& key);
 
-    void expire(const string& key,int seconds);
+    bool expire(const string& key,int seconds);
 
     bool isExpired(const string& key);
 
@@ -32,7 +32,7 @@ public:
 
     bool exists(const string& key);
 
-    vector<string> keys() const; // const because you only read the key no CRUD operaton
+    vector<string> keys();
 
     void clear();
 
@@ -40,7 +40,7 @@ public:
 
     int append(const string& key, const string& value);
 
-    int strlen(const string& key) const;
+    int strlen(const string& key);
 
     string getset(const string& key,const string& value);
 
@@ -48,9 +48,9 @@ public:
 
     int decrby(const string& key, int decrement);
 
-    size_t size() const;
+    size_t size();
 
-    string info() const;
+    string info();
 
     bool rename(const string& oldKey, const string& newKey);
 

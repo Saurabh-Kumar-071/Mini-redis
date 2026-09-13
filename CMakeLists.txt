@@ -23,7 +23,27 @@ add_executable(
     src/utils/Split.cpp
 )
 
+add_executable(
+    test_suite
+    tests/test_suite.cpp
+    src/database/Database.cpp
+    src/command/CommandParser.cpp
+    src/command/CommandExecutor.cpp
+    src/client/ClientConnection.cpp
+    src/persistence/PersistenceManager.cpp
+    src/network/EpollManager.cpp
+    src/network/FileDescriptor.cpp
+    src/scheduler/Scheduler.cpp
+    src/protocol/RESPEncoder.cpp
+    src/utils/Split.cpp
+)
+
 target_link_libraries(
     MiniRedis
+    pthread
+)
+
+target_link_libraries(
+    test_suite
     pthread
 )

@@ -28,6 +28,14 @@ void Server::stop() {
 Server::Server(ILogger &logger)
     : logger(logger), executor(db, persistence), server_fd(-1), scheduler(epollManager) {
     persistence.load(db);
+    // Load password from environment variable MINIREDIS_PASSWORD
+    executor.loadPasswordFromEnv();
+    // Show auth status on startup
+    if (executor.hasPassword()) {
+        logger.info("Authentication ENABLED (password loaded from MINIREDIS_PASSWORD)");
+    } else {
+        logger.info("[WARN] Authentication DISABLED — set MINIREDIS_PASSWORD env var to require a password");
+    }
 }
 
 bool setNonBlocking(int fd);
@@ -105,7 +113,7 @@ void Server::handleClientEvent(epoll_event &event)
 
                 CommandResponse response;
                 try {
-                    response = executor.execute(result.command);
+                    response = executor.execute(result.command, *client);
                 } catch (const exception& e) {
                     response = {ResponseType::Error, string("ERR ") + e.what()};
                 } catch (...) {
@@ -280,7 +288,9 @@ void Server::start()
                 continue;
             }
 
-            auto client = make_unique<ClientConnection>(client_fd);
+            // If no password is configured, clients are authenticated immediately
+            bool noPasswordSet = !executor.hasPassword();
+            auto client = make_unique<ClientConnection>(client_fd, noPasswordSet);
 
             scheduler.registerContext(client_fd, move(client), [this](epoll_event& event){
                 handleClientEvent(event);

@@ -169,6 +169,47 @@ python3 tests/integration_test.py
 
 ---
 
+## Deployment
+
+### Option 1: Docker (Recommended)
+
+Build and run using Docker:
+```bash
+# Build the Docker image
+docker build -t miniredis .
+
+# Run container exposing port 8080
+docker run -d -p 8080:8080 -v $(pwd)/data:/app miniredis
+```
+
+Or using **Docker Compose**:
+```bash
+docker compose up -d
+```
+
+### Option 2: Linux Cloud VM (AWS EC2 / DigitalOcean / GCP) with Systemd
+
+1. Copy the repository to `/opt/miniredis` and build the binary:
+   ```bash
+   sudo git clone https://github.com/Saurabh-Kumar-071/Mini-redis.git /opt/miniredis
+   cd /opt/miniredis && mkdir -p build && cd build && cmake .. && make
+   ```
+
+2. Install and enable the systemd service:
+   ```bash
+   sudo cp /opt/miniredis/miniredis.service /etc/systemd/system/
+   sudo systemctl daemon-reload
+   sudo systemctl enable --now miniredis
+   ```
+
+3. Check service status:
+   ```bash
+   sudo systemctl status miniredis
+   ```
+
+---
+
 ## License
 
 This project is open source and available under the [MIT License](LICENSE).
+

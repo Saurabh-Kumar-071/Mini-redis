@@ -8,8 +8,9 @@ private:
     FileDescriptor fd;
     string readBuffer;
     string writeBuffer;
+    bool authenticated;  // true if client has passed AUTH (or no password set)
 public:
-    ClientConnection(int fd);
+    ClientConnection(int fd, bool startAuthenticated = false);
 
     int getFd() const;
 
@@ -24,5 +25,8 @@ public:
     void clearWriteBuffer();
 
     void consumeReadBuffer(size_t bytes);
+
+    bool isAuthenticated() const;
+    void setAuthenticated(bool value);
 
 };

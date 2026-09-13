@@ -1,0 +1,19 @@
+[Unit]
+Description=MiniRedis In-Memory Key-Value Store
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/miniredis
+ExecStart=/opt/miniredis/build/MiniRedis
+Restart=always
+RestartSec=3s
+LimitNOFILE=65535
+
+# Graceful SIGINT shutdown
+KillSignal=SIGINT
+TimeoutStopSec=10s
+
+[Install]
+WantedBy=multi-user.target

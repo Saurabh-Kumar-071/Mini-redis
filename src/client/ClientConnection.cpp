@@ -2,7 +2,8 @@
 #include "ClientConnection.h"              //RAII (Resource Acquisition Is Initialization).
 #include <unistd.h>
 
-ClientConnection::ClientConnection(int fd): fd(fd){
+ClientConnection::ClientConnection(int fd, bool startAuthenticated)
+    : fd(fd), authenticated(startAuthenticated){
 }
 
 int ClientConnection::getFd() const{
@@ -32,4 +33,12 @@ string& ClientConnection::getWriteBuffer(){
 
 void ClientConnection::consumeReadBuffer(size_t bytes){
     readBuffer.erase(0, bytes);
+}
+
+bool ClientConnection::isAuthenticated() const {
+    return authenticated;
+}
+
+void ClientConnection::setAuthenticated(bool value) {
+    authenticated = value;
 }

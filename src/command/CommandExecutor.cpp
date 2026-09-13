@@ -2,6 +2,7 @@
 #include "CommandExecutor.h"
 #include <algorithm>
 #include <cctype>
+#include <cstdlib>
 
 using namespace std;
 
@@ -9,7 +10,14 @@ CommandExecutor::CommandExecutor(Database& database, PersistenceManager& persist
     : db(database), persistence(persistence) {
 }
 
-CommandResponse CommandExecutor::execute(const ParsedCommand& cmd){
+void CommandExecutor::loadPasswordFromEnv() {
+    const char* pwd = getenv("MINIREDIS_PASSWORD");
+    if (pwd && pwd[0] != '\0') {
+        serverPassword = string(pwd);
+    }
+}
+
+CommandResponse CommandExecutor::execute(const ParsedCommand& cmd, ClientConnection& client){
     if(cmd.arguments.empty()) {
         return {ResponseType::Error, "ERR unknown command"};
     }
@@ -20,11 +28,30 @@ CommandResponse CommandExecutor::execute(const ParsedCommand& cmd){
 
     string command = cmd.arguments[0];
     // Convert command name to uppercase for case insensitivity
-    for (char &c : command) {
+    for (char& c : command) {
         c = toupper(static_cast<unsigned char>(c));
     }
 
-    // 1. PING
+    // AUTH command — always allowed even if not yet authenticated
+    if (command == "AUTH") {
+        if (cmd.arguments.size() != 2) {
+            return {ResponseType::Error, "ERR wrong number of arguments for 'auth' command"};
+        }
+        if (serverPassword.empty()) {
+            return {ResponseType::Error, "ERR Client sent AUTH, but no password is set. Did you mean ACL SETUSER with >password?"};
+        }
+        if (cmd.arguments[1] == serverPassword) {
+            client.setAuthenticated(true);
+            return {ResponseType::SimpleString, "OK"};
+        }
+        return {ResponseType::Error, "WRONGPASS invalid username-password pair or user is disabled."};
+    }
+
+    // Block all other commands if password is set and client not yet authenticated
+    if (!serverPassword.empty() && !client.isAuthenticated()) {
+        return {ResponseType::Error, "NOAUTH Authentication required. Please run AUTH <password>"};
+    }
+
     if(command == "PING"){
         if (cmd.arguments.size() == 1) {
             return {ResponseType::SimpleString, "PONG"};

@@ -1,0 +1,13 @@
+# Exclude local build directory — CMakeCache.txt has host paths that conflict inside Docker
+build/
+
+# Git and editor files (not needed in container)
+.git/
+.vscode/
+.gitignore
+.dockerignore
+
+# Docs and logs
+docs/
+server.log
+data/

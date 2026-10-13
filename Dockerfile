@@ -45,5 +45,8 @@ EXPOSE 8080
 # Drop root privileges — run as non-root user
 USER miniredis
 
+# Save runtime files (dump.rdb) inside mounted volume
+WORKDIR /app/data
+
 # Run MiniRedis server
 CMD ["/app/MiniRedis"]

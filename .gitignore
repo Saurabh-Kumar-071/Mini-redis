@@ -3,3 +3,5 @@ build/
 docs/
 .pijul/
 .env
+data/
+dump.rdb

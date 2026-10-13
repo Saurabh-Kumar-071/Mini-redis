@@ -494,8 +494,17 @@ CommandResponse CommandExecutor::execute(const ParsedCommand& cmd, ClientConnect
         if (cmd.arguments.size() != 1 && cmd.arguments.size() != 2) {
             return {ResponseType::Error, "ERR wrong number of arguments for 'keys' command"};
         }
+
         vector<string> keys = db.keys();
-        return {ResponseType::Array, "", keys};
+        vector<string>allowedKeys;
+
+        for (const string& k : keys) {
+            if (currentUser.empty() ||aclManager.canAccessKey(currentUser, k)) {
+                allowedKeys.push_back(k);
+            }
+        }
+        
+        return {ResponseType::Array, "", allowedKeys};
     }
 
     // 15. FLUSHDB

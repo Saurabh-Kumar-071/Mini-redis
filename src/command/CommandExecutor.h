@@ -2,6 +2,7 @@
 
 #include <string>
 #include <set>
+#include <vector>
 #include "../database/Database.h"
 #include "CommandParser.h"
 #include "../persistence/PersistenceManager.h"
@@ -18,8 +19,8 @@ class CommandExecutor{
      PersistenceManager& persistence;
      AclManager aclManager;  // replaces single serverPassword
 
-     // Returns the primary key from a key-based command (used for key permission checks)
-     string getPrimaryKey(const string& command, const ParsedCommand& cmd) const;
+     // Returns all keys from a key-based command (used for key permission checks)
+     vector<string> getAllKeys(const string& command, const ParsedCommand& cmd) const;
 
      // Handles all ACL subcommands (SETUSER, DELUSER, LIST, WHOAMI, GETUSER)
      CommandResponse handleAclCommand(const ParsedCommand& cmd, ClientConnection& client);

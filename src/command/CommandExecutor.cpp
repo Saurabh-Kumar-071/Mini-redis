@@ -23,20 +23,39 @@ void CommandExecutor::loadPasswordFromEnv() {
     aclManager.loadDefaultFromEnv();
 }
 
-// ---------------------------------------------------------------------------
-// Helper: extract the primary key from a key-based command
-// ---------------------------------------------------------------------------
-
-string CommandExecutor::getPrimaryKey(const string& command, const ParsedCommand& cmd) const {
+vector<string> CommandExecutor::getAllKeys(const string& command, const ParsedCommand& cmd) const {
     static const set<string> keyCommands = {
         "GET", "SET", "DEL", "EXPIRE", "TTL", "PERSIST", "APPEND",
         "STRLEN", "GETSET", "INCRBY", "DECRBY", "INCR", "DECR",
         "TYPE", "RENAME", "EXISTS", "MGET", "MSET", "MDEL"
     };
-    if (keyCommands.count(command) == 0) return "";
-    if (cmd.arguments.size() < 2)       return "";
-    return cmd.arguments[1];
+
+    vector<string> keys;
+    if (keyCommands.count(command) == 0) return keys;
+    if (cmd.arguments.size() < 2) return keys;
+
+    if (command == "MSET") {
+        // MSET key1 val1 key2 val2 ... (keys are at odd indices: 1, 3, 5, ...)
+        for (size_t i = 1; i < cmd.arguments.size(); i += 2) {
+            keys.push_back(cmd.arguments[i]);
+        }
+    } else if (command == "MGET" || command == "DEL" || command == "MDEL" || command == "EXISTS") {
+        // Multi-key commands where all arguments from index 1 are keys
+        for (size_t i = 1; i < cmd.arguments.size(); i++) {
+            keys.push_back(cmd.arguments[i]);
+        }
+    } else if (command == "RENAME") {
+        keys.push_back(cmd.arguments[1]);
+        if (cmd.arguments.size() >= 3) {
+            keys.push_back(cmd.arguments[2]);
+        }
+    } else {
+        // Single-key commands (GET, SET, EXPIRE, etc.)
+        keys.push_back(cmd.arguments[1]);
+    }
+    return keys;
 }
+
 
 // ---------------------------------------------------------------------------
 // ACL subcommand handler
@@ -290,10 +309,14 @@ CommandResponse CommandExecutor::execute(const ParsedCommand& cmd, ClientConnect
                     cmd.arguments[0] + "' command"};
         }
         // 2. Key permission (only for commands that operate on keys)
-        string primaryKey = getPrimaryKey(command, cmd);
-        if (!primaryKey.empty() && !aclManager.canAccessKey(currentUser, primaryKey)) {
-            return {ResponseType::Error,
-                    "NOPERM No permissions to access key '" + primaryKey + "'"};
+       vector<string> keys = getAllKeys(command, cmd);
+        if(!keys.empty()){
+            for( const string& key : keys){
+                if (!aclManager.canAccessKey(currentUser, key)) {
+                    return {ResponseType::Error,
+                            "NOPERM No permissions to access key '" + key + "'"};
+                }
+            }
         }
     }
 

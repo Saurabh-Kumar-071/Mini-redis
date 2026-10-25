@@ -84,7 +84,9 @@ void Server::handleClientEvent(epoll_event &event)
         }
 
         epollManager.modifyFd(event.data.fd, EPOLLIN | EPOLLET | EPOLLRDHUP);
-        return;
+        if (!(event.events & EPOLLIN)) {
+            return;
+        }
     }
 
     // Handle readable event

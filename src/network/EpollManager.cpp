@@ -29,7 +29,9 @@ void EpollManager::addFd(int fd){
 
 void EpollManager::removeFd(int fd){
     if(epoll_ctl( epoll_fd.get(),EPOLL_CTL_DEL,fd,nullptr) == -1) {
-        throw SocketException(string("epoll delete failed: ")+ strerror(errno));
+        if(errno != ENOENT && errno != EBADF){
+            throw SocketException(string("epoll delete failed: ")+ strerror(errno));
+        }
     }
 }
 
@@ -44,7 +46,9 @@ void EpollManager::modifyFd(int fd,uint32_t events){
        ev.data.fd = fd;
 
       if(epoll_ctl(epoll_fd.get(),EPOLL_CTL_MOD,fd,&ev) == -1){
-          throw SocketException(string("epoll modify failed: ")+ strerror(errno));
+        if(errno != ENOENT && errno != EBADF){
+            throw SocketException(string("epoll modify failed: ")+ strerror(errno));
+        }
     }
 }
 

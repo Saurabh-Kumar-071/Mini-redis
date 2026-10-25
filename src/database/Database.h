@@ -44,9 +44,9 @@ public:
 
     string getset(const string& key,const string& value);
 
-    int incrby(const string& key, int increment);
+    long long incrby(const string& key, long long increment);
 
-    int decrby(const string& key, int decrement);
+    long long decrby(const string& key, long long decrement);
 
     size_t size();
 

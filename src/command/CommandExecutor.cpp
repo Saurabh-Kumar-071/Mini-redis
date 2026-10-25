@@ -473,17 +473,9 @@ CommandResponse CommandExecutor::execute(const ParsedCommand& cmd, ClientConnect
         }
         const string& key = cmd.arguments[1];
         try {
-            if (!db.exists(key)){
-                db.set(key, "1");
-                persistence.markDirty();
-                return {ResponseType::Integer, "1"};
-            }
-
-            long long value = stoll(db.get(key));
-            value++;
-            db.set(key, to_string(value));
+            long long ans = db.incrby(key, 1);
             persistence.markDirty();
-            return {ResponseType::Integer, to_string(value)};
+            return {ResponseType::Integer, to_string(ans)};
         } catch (...) {
             return {ResponseType::Error, "ERR value is not an integer or out of range"};
         }
@@ -496,17 +488,9 @@ CommandResponse CommandExecutor::execute(const ParsedCommand& cmd, ClientConnect
         }
         const string& key = cmd.arguments[1];
         try {
-            if (!db.exists(key)){
-                db.set(key, "-1");
-                persistence.markDirty();
-                return {ResponseType::Integer, "-1"};
-            }
-
-            long long value = stoll(db.get(key));
-            value--;
-            db.set(key, to_string(value));
+            long long ans = db.decrby(key, 1);
             persistence.markDirty();
-            return {ResponseType::Integer, to_string(value)};
+            return {ResponseType::Integer, to_string(ans)};
         } catch (...) {
             return {ResponseType::Error, "ERR value is not an integer or out of range"};
         }
@@ -595,15 +579,15 @@ CommandResponse CommandExecutor::execute(const ParsedCommand& cmd, ClientConnect
             return {ResponseType::Error, "ERR wrong number of arguments for 'incrby' command"};
         }
         const string& key = cmd.arguments[1];
-        int increment = 0;
+        long long increment = 0;
         try {
-            increment = stoi(cmd.arguments[2]);
+            increment = stoll(cmd.arguments[2]);
         } catch (...) {
             return {ResponseType::Error, "ERR value is not an integer or out of range"};
         }
 
         try {
-            int ans = db.incrby(key, increment);
+            long long ans = db.incrby(key, increment);
             persistence.markDirty();
             return {ResponseType::Integer, to_string(ans)};
         } catch (...) {
@@ -617,15 +601,15 @@ CommandResponse CommandExecutor::execute(const ParsedCommand& cmd, ClientConnect
             return {ResponseType::Error, "ERR wrong number of arguments for 'decrby' command"};
         }
         const string& key = cmd.arguments[1];
-        int decrement = 0;
+        long long decrement = 0;
         try {
-            decrement = stoi(cmd.arguments[2]);
+            decrement = stoll(cmd.arguments[2]);
         } catch (...) {
             return {ResponseType::Error, "ERR value is not an integer or out of range"};
         }
 
         try {
-            int ans = db.decrby(key, decrement);
+            long long ans = db.decrby(key, decrement);
             persistence.markDirty();
             return {ResponseType::Integer, to_string(ans)};
         } catch (...) {

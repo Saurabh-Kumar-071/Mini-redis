@@ -24,6 +24,13 @@ string Database::get(const string& key) {
 }
 
 bool Database::del(const string &key){
+  
+    if(isExpired(key)){
+        data.erase(key);
+        expiry.erase(key);
+        return false;
+    }
+
     auto it = data.find(key);
     if(it != data.end()){
         data.erase(it);
@@ -152,19 +159,30 @@ string Database::getset(const string& key, const string& value){
     return old_val;
 }
 
-int Database::incrby(const string& key, int increment){
+long long Database::incrby(const string& key, long long increment){
+    
+    if (isExpired(key)) {
+        data.erase(key);
+        expiry.erase(key);
+    }
+
     if (!exists(key)) {
         set(key, to_string(increment));
         return increment;
     }
 
-    int value = stoi(get(key));
+    const string& current = data[key];
+    size_t idx = 0;
+    long long value = stoll(current, &idx);
+    if (idx != current.size()) {
+        throw std::invalid_argument("ERR value is not an integer or out of range");
+    }
     value += increment;
     data[key] = to_string(value);
     return value;
 }
 
-int Database::decrby(const string& key, int decrement){
+long long Database::decrby(const string& key, long long decrement){
     return incrby(key, -decrement);
 }
 
@@ -181,6 +199,9 @@ string Database::info(){
 bool Database::rename(const string& oldKey, const string& newKey){
     if (!exists(oldKey))
         return false;
+
+    if (oldKey == newKey)
+        return true;
 
     data[newKey] = std::move(data[oldKey]);
     data.erase(oldKey);

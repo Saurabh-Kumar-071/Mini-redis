@@ -111,7 +111,11 @@ void Server::handleClientEvent(epoll_event &event)
                 }
 
                 if(!result.complete) break;
-                if (result.command.arguments.empty()) break;
+        
+                if (result.command.arguments.empty()) {
+                    client->consumeReadBuffer(result.bytesConsumed);
+                    continue;
+                }
 
                 CommandResponse response;
                 try {

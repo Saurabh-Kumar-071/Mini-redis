@@ -13,6 +13,13 @@ ParseResult CommandParser::parseRESP(const string& input){
     // ---------- Inline protocol ----------
     if (input[0] != '*'){
         size_t end = input.find("\r\n");
+        
+        size_t delim_len = 2;
+        if (end == string::npos) {
+            end = input.find('\n');
+            delim_len = 1;
+        }
+
         if (end == string::npos)
             return result;
 
@@ -23,7 +30,7 @@ ParseResult CommandParser::parseRESP(const string& input){
             result.command.arguments.push_back(word);
 
         result.complete = !result.command.arguments.empty();
-        result.bytesConsumed = end + 2;
+        result.bytesConsumed = end + delim_len;
 
         return result;
     }

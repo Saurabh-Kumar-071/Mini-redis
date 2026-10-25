@@ -13,12 +13,17 @@ void  PersistenceManager::save(const Database& db){
   }
   const auto& data = db.getAllData();
   const auto& expiry = db.getAllExpiry();
+  auto now = chrono::system_clock::now();
 
   for( const auto& pair : data){
 
     auto it = expiry.find(pair.first);
 
     if(it!= expiry.end()){
+      //if key is expired then skip it 
+      if (now >= it->second) {
+          continue;
+      }
       auto timestamp = chrono::system_clock::to_time_t(it->second);
 
       file<<pair.first<<"="<<pair.second<<"|"<<timestamp<<endl;

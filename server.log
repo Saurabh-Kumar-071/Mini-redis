@@ -1,3 +1,4 @@
+[INFO][WARN] ACL DISABLED — set MINIREDIS_PASSWORD env var or use ACL SETUSER to require authentication.
 [INFO]Socket Creation Successfully
 [INFO]Bind connection is successfully
 [INFO]Server listening on port 8080. Waiting for clients...

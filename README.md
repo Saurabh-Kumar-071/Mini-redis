@@ -1,5 +1,7 @@
 # MiniRedis: Asynchronous In-Memory Key-Value Store
 
+[![Build & Test](https://github.com/saurabh-kumar-071/Mini-redis/actions/workflows/ci.yml/badge.svg)](https://github.com/saurabh-kumar-071/Mini-redis/actions)
+
 [![C++17](https://img.shields.io/badge/Language-C%2B%2B17-blue.svg)](https://en.wikipedia.org/wiki/C%2B%2B17)
 [![Linux](https://img.shields.io/badge/Platform-Linux-orange.svg)](https://www.kernel.org/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)

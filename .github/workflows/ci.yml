@@ -1,0 +1,31 @@
+name: MiniRedis CI
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Install Dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y cmake g++ python3
+
+    - name: Configure CMake
+      run: cmake -B build -S .
+
+    - name: Build Project
+      run: cmake --build build -j$(nproc)
+
+    - name: Run C++ Unit Test Suite
+      run: ./build/test_suite
+
+    - name: Run Live Python Integration Tests
+      run: python3 tests/integration_test.py

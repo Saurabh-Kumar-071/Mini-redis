@@ -3,12 +3,15 @@ const http = require('http');
 const WebSocket = require('ws');
 const net = require('net');
 const path = require('path');
+
 const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
-const REDIS_HOST = process.env.REDIS_HOST;
-const REDIS_PORT = parseInt(process.env.REDIS_PORT);
-const PORT = process.env.PORT;
+
+const REDIS_HOST = process.env.REDIS_HOST || '127.0.0.1';
+const REDIS_PORT = parseInt(process.env.REDIS_PORT || '8080', 10);
+const PORT = process.env.PORT || 3000;
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Health check endpoint for cloud platforms (Render, Railway, etc.)
@@ -20,10 +23,12 @@ wss.on('connection', (ws) => {
     const client = new net.Socket();
 
     client.connect(REDIS_PORT, REDIS_HOST, () => {
-        ws.send(JSON.stringify({
-            type: 'system',
-            data: 'Connected to MiniRedis C++ Server (Port ' + REDIS_PORT + ')\r\nType commands below (e.g. PING, SET, GET, INCR, DBSIZE)...\r\n'
-        }));
+        if (ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({
+                type: 'system',
+                data: 'Connected to MiniRedis C++ Server (Port ' + REDIS_PORT + ')\r\nType commands below (e.g. PING, SET, GET, INCR, DBSIZE)...\r\n'
+            }));
+        }
     });
 
     client.on('data', (data) => {
@@ -34,7 +39,6 @@ wss.on('connection', (ws) => {
             }));
         }
     });
-
 
     client.on('close', () => {
         if (ws.readyState === WebSocket.OPEN) {
@@ -58,11 +62,21 @@ wss.on('connection', (ws) => {
     ws.on('message', (message) => {
         try {
             const raw = message.toString();
-            // Send inline command followed by CRLF to MiniRedis TCP server
-            client.write(raw.trim() + '\r\n');
+            if (client && !client.destroyed) {
+                client.write(raw.trim() + '\r\n');
+            } else if (ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: 'error', data: '[Error: MiniRedis server is not connected]\r\n' }));
+            }
         } catch (err) {
-            ws.send(JSON.stringify({ type: 'error', data: err.message }));
+            if (ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: 'error', data: err.message }));
+            }
         }
+    });
+
+    ws.on('error', (err) => {
+        console.error('WebSocket client error:', err.message);
+        client.destroy();
     });
 
     ws.on('close', () => {

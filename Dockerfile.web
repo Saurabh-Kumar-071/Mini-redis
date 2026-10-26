@@ -1,0 +1,28 @@
+FROM ubuntu:22.04
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install C++ compiler, CMake, and Node.js
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    cmake \
+    g++ \
+    curl \
+    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y nodejs \
+    && rm -rf /var/lib/apt/lists/*
+WORKDIR /app
+
+COPY . .
+# Build MiniRedis C++ binary
+RUN mkdir -p build && cd build && \
+    cmake -DCMAKE_BUILD_TYPE=Release .. && \
+    make -j$(nproc)
+# Install Node.js dependencies for web demo
+
+WORKDIR /app/web
+RUN npm install --production
+WORKDIR /app
+RUN chmod +x /app/start-web.sh
+# Web server port (Render & Railway inject dynamic PORT env var)
+EXPOSE 3000
+CMD ["/app/start-web.sh"]

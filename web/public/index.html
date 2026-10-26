@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MiniRedis Terminal</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      background-color: #121212;
+      color: #e0e0e0;
+      font-family: monospace, Consolas, "Courier New", Courier;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      padding: 12px;
+    }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 10px;
+      border-bottom: 1px solid #333;
+      margin-bottom: 10px;
+      font-size: 14px;
+    }
+    .status {
+      font-size: 13px;
+    }
+    .status.connected {
+      color: #4caf50;
+    }
+    .status.disconnected {
+      color: #f44336;
+    }
+    #terminal {
+      flex: 1;
+      background: #000;
+      border: 1px solid #333;
+      border-radius: 4px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    #output {
+      flex: 1;
+      padding: 12px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
+      line-height: 1.4;
+      font-size: 14px;
+    }
+    .cmd {
+      color: #90caf9;
+    }
+    .system {
+      color: #888;
+    }
+    .error {
+      color: #ef5350;
+    }
+    .input-bar {
+      display: flex;
+      align-items: center;
+      border-top: 1px solid #222;
+      background: #0a0a0a;
+      padding: 8px 12px;
+    }
+    .prompt {
+      color: #4caf50;
+      margin-right: 8px;
+      user-select: none;
+    }
+    #input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: #fff;
+      font-family: inherit;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div><strong>MiniRedis Web Terminal</strong> (Port 8080)</div>
+    <div id="status" class="status disconnected">Disconnected</div>
+  </header>
+
+  <div id="terminal">
+    <div id="output"></div>
+    <div class="input-bar">
+      <span class="prompt">redis&gt;</span>
+      <input type="text" id="input" autocomplete="off" autofocus placeholder="Type Redis command..." />
+    </div>
+  </div>
+
+  <script>
+    const output = document.getElementById('output');
+    const input = document.getElementById('input');
+    const statusEl = document.getElementById('status');
+
+    const history = [];
+    let historyIdx = 0;
+    let socket = null;
+    let reconnectTimer = null;
+
+    function connect() {
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      socket = new WebSocket(`${protocol}//${window.location.host}`);
+
+      socket.onopen = () => {
+        statusEl.textContent = 'Connected';
+        statusEl.className = 'status connected';
+        appendOutput('[Connected to MiniRedis server]\n', 'system');
+      };
+
+      socket.onmessage = (event) => {
+        try {
+          const msg = JSON.parse(event.data);
+          appendOutput(msg.data, msg.type);
+        } catch (e) {
+          appendOutput(event.data, 'output');
+        }
+      };
+
+      socket.onclose = () => {
+        statusEl.textContent = 'Disconnected';
+        statusEl.className = 'status disconnected';
+        appendOutput('\n[Connection closed. Reconnecting in 3s...]\n', 'system');
+        reconnectTimer = setTimeout(connect, 3000);
+      };
+
+      socket.onerror = () => {
+        socket.close();
+      };
+    }
+
+    function appendOutput(text, type = '') {
+      const span = document.createElement('span');
+      if (type) span.className = type;
+      span.textContent = text;
+      output.appendChild(span);
+      output.scrollTop = output.scrollHeight;
+    }
+
+    function sendCommand() {
+      const cmd = input.value.trim();
+      if (!cmd) return;
+
+      if (cmd.toLowerCase() === 'clear') {
+        output.innerHTML = '';
+        input.value = '';
+        return;
+      }
+
+      appendOutput(`redis> ${cmd}\n`, 'cmd');
+      if (socket && socket.readyState === WebSocket.OPEN) {
+        socket.send(cmd);
+      } else {
+        appendOutput('[Error: Socket not connected]\n', 'error');
+      }
+
+      history.push(cmd);
+      historyIdx = history.length;
+      input.value = '';
+    }
+
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        sendCommand();
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (historyIdx > 0) {
+          historyIdx--;
+          input.value = history[historyIdx];
+        }
+      } else if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        if (historyIdx < history.length - 1) {
+          historyIdx++;
+          input.value = history[historyIdx];
+        } else {
+          historyIdx = history.length;
+          input.value = '';
+        }
+      }
+    });
+
+    document.getElementById('terminal').addEventListener('click', () => {
+      input.focus();
+    });
+
+    connect();
+  </script>
+</body>
+</html>

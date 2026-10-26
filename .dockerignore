@@ -1,13 +1,23 @@
 # Exclude local build directory — CMakeCache.txt has host paths that conflict inside Docker
 build/
 
-# Git and editor files (not needed in container)
+# Git and editor files
 .git/
 .vscode/
 .gitignore
 .dockerignore
 
+# Secrets and local data
+.env
+data/
+dump.rdb
+*.rdb
+
+# Node.js dependencies
+node_modules/
+**/node_modules/
+
 # Docs and logs
 docs/
 server.log
-data/
+*.log

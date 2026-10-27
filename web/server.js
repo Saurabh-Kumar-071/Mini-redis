@@ -350,6 +350,7 @@ Please authenticate to continue:
       AUTH <user> <pass>      Log in to your private database
       WHOAMI                  Show current logged-in identity
       LOGOUT                  Log out of current session
+      USERS                   List all registered users (admin only)
   • Data Operations (keys are isolated for regular users):
       SET <key> <val>         Store a string value
       GET <key>               Retrieve value
@@ -410,6 +411,8 @@ Please authenticate to continue:
 
                 userManager.createUser(username, password);
                 currentUser = username;
+
+                console.log(`[AUTH] New user registered: "${username}" at ${new Date().toISOString()}`);
 
                 return ws.send(JSON.stringify({
                     type: 'auth_success',
@@ -517,6 +520,32 @@ Please authenticate to continue:
                 return ws.send(JSON.stringify({
                     type: 'logout',
                     data: 'OK Logged out. Please authenticate to continue.\r\n'
+                }));
+            }
+
+            // 7b. USERS (Admin only: list all registered web users)
+            if (commandName === 'USERS') {
+                if (!isAdmin) {
+                    return ws.send(JSON.stringify({
+                        type: 'error',
+                        data: "(error) ERR Command 'USERS' is restricted to administrators.\r\n"
+                    }));
+                }
+                const users = userManager.listUsers();
+                if (users.length === 0) {
+                    return ws.send(JSON.stringify({
+                        type: 'output',
+                        data: "(empty list: no registered users yet)\r\n"
+                    }));
+                }
+                let out = `Registered Cloud Users (${users.length}):\r\n`;
+                users.forEach((u, idx) => {
+                    const dateStr = u.createdAt ? new Date(u.createdAt).toISOString().replace('T', ' ').slice(0, 19) + ' UTC' : 'unknown';
+                    out += `${idx + 1}) "${u.username}" (registered: ${dateStr})\r\n`;
+                });
+                return ws.send(JSON.stringify({
+                    type: 'output',
+                    data: out
                 }));
             }
 

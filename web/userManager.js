@@ -91,6 +91,13 @@ class UserManager {
     getUserCount() {
         return Object.keys(this.users).length;
     }
+
+    listUsers() {
+        return Object.values(this.users).map(u => ({
+            username: u.username,
+            createdAt: u.createdAt || null
+        }));
+    }
 }
 
 module.exports = new UserManager();

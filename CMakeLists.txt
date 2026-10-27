@@ -20,7 +20,6 @@ add_executable(
     src/network/FileDescriptor.cpp
     src/scheduler/Scheduler.cpp
     src/protocol/RESPEncoder.cpp
-    src/utils/Split.cpp
     src/acl/AclManager.cpp
 )
 
@@ -36,7 +35,6 @@ add_executable(
     src/network/FileDescriptor.cpp
     src/scheduler/Scheduler.cpp
     src/protocol/RESPEncoder.cpp
-    src/utils/Split.cpp
     src/acl/AclManager.cpp
 )
 

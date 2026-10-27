@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: miniredis-web
+    runtime: docker
+    dockerfilePath: Dockerfile.web
+    plan: free
+    healthCheckPath: /healthz
+    envVars:
+      - key: MINIREDIS_PASSWORD
+        generateValue: true

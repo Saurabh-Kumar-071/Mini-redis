@@ -154,6 +154,7 @@ python3 tests/integration_test.py
 ├── README.md                   # Project documentation
 ├── src
 │   ├── main.cpp                # Server entry point
+│   ├── acl                     # ACL user management & authentication
 │   ├── client                  # ClientConnection & socket buffer management
 │   ├── command                 # RESP CommandParser & CommandExecutor (27 commands)
 │   ├── database                # In-memory storage & TTL expiration logic
@@ -162,8 +163,7 @@ python3 tests/integration_test.py
 │   ├── network                 # EpollManager (EPOLLET) & FileDescriptor RAII
 │   ├── persistence             # PersistenceManager (dump.rdb snapshot engine)
 │   ├── protocol                # RESPEncoder serialization
-│   ├── scheduler               # Reactor event dispatcher
-│   └── utils                   # Helper utilities
+│   └── scheduler               # Reactor event dispatcher
 └── tests
     ├── test_suite.cpp          # Automated C++ test suite
     └── integration_test.py     # Live TCP integration & fuzzing test suite

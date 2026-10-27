@@ -13,9 +13,15 @@ else
     ./build/MiniRedis &
 fi
 
-# Wait for MiniRedis to accept connections
+# Dynamically poll until MiniRedis port 8080 is accepting TCP connections
 echo "[*] Waiting for MiniRedis to accept connections..."
-sleep 1
+for i in {1..20}; do
+    if (echo > /dev/tcp/127.0.0.1/8080) 2>/dev/null; then
+        echo "[+] MiniRedis backend ready on port 8080."
+        break
+    fi
+    sleep 0.2
+done
 
 echo "[+] Starting Node.js Web Gateway on port ${PORT:-3000}..."
 if [ -f "/app/web/server.js" ]; then

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>MiniRedis Terminal</title>
+  <title>MiniRedis Cloud Terminal</title>
   <style>
     * {
       box-sizing: border-box;
@@ -11,9 +11,9 @@
       padding: 0;
     }
     body {
-      background-color: #121212;
+      background-color: #0f111a;
       color: #e0e0e0;
-      font-family: monospace, Consolas, "Courier New", Courier;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
       display: flex;
       flex-direction: column;
       height: 100vh;
@@ -24,9 +24,28 @@
       justify-content: space-between;
       align-items: center;
       padding-bottom: 10px;
-      border-bottom: 1px solid #333;
+      border-bottom: 1px solid #232738;
       margin-bottom: 10px;
       font-size: 14px;
+    }
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .header-right {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      background: #1a1e2e;
+      border: 1px solid #2a3048;
     }
     .status {
       font-size: 13px;
@@ -39,42 +58,49 @@
     }
     #terminal {
       flex: 1;
-      background: #000;
-      border: 1px solid #333;
-      border-radius: 4px;
+      background: #08090f;
+      border: 1px solid #232738;
+      border-radius: 6px;
       display: flex;
       flex-direction: column;
       overflow: hidden;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
     }
     #output {
       flex: 1;
-      padding: 12px;
+      padding: 14px;
       overflow-y: auto;
       white-space: pre-wrap;
       word-break: break-all;
-      line-height: 1.4;
+      line-height: 1.45;
       font-size: 14px;
     }
     .cmd {
-      color: #90caf9;
+      color: #64b5f6;
+      font-weight: 600;
     }
     .system {
-      color: #888;
+      color: #81c784;
     }
     .error {
       color: #ef5350;
     }
+    .output {
+      color: #e0e0e0;
+    }
     .input-bar {
       display: flex;
       align-items: center;
-      border-top: 1px solid #222;
-      background: #0a0a0a;
-      padding: 8px 12px;
+      border-top: 1px solid #1a1e2e;
+      background: #0d0f17;
+      padding: 10px 14px;
     }
     .prompt {
       color: #4caf50;
-      margin-right: 8px;
+      margin-right: 10px;
       user-select: none;
+      font-weight: bold;
+      white-space: nowrap;
     }
     #input {
       flex: 1;
@@ -89,15 +115,21 @@
 </head>
 <body>
   <header>
-    <div><strong>MiniRedis Web Terminal</strong> (Port 8080)</div>
-    <div id="status" class="status disconnected">Disconnected</div>
+    <div class="header-left">
+      <strong>MiniRedis Cloud Terminal</strong>
+      <span class="badge">Isolated Multi-Tenant</span>
+    </div>
+    <div class="header-right">
+      <div>Session: <span id="userBadge" style="color: #ffb74d; font-weight: bold;">Unauthenticated</span></div>
+      <div id="status" class="status disconnected">Disconnected</div>
+    </div>
   </header>
 
   <div id="terminal">
     <div id="output"></div>
     <div class="input-bar">
-      <span class="prompt">MiniRedis&gt;</span>
-      <input type="text" id="input" autocomplete="off" autofocus placeholder="Type MiniRedis command..." />
+      <span class="prompt" id="promptSpan">MiniRedis (unauthenticated)&gt;</span>
+      <input type="text" id="input" autocomplete="off" autofocus placeholder="Type command (e.g. REGISTER, AUTH, HELP)..." />
     </div>
   </div>
 
@@ -105,11 +137,32 @@
     const output = document.getElementById('output');
     const input = document.getElementById('input');
     const statusEl = document.getElementById('status');
+    const promptSpan = document.getElementById('promptSpan');
+    const userBadge = document.getElementById('userBadge');
 
+    let currentUser = null;
     const history = [];
     let historyIdx = 0;
     let socket = null;
     let reconnectTimer = null;
+
+    function getPromptText() {
+      return currentUser ? `MiniRedis (${currentUser})>` : `MiniRedis (unauthenticated)>`;
+    }
+
+    function updateUIState() {
+      if (currentUser) {
+        userBadge.textContent = currentUser;
+        userBadge.style.color = '#4caf50';
+        promptSpan.textContent = `${getPromptText()} `;
+        promptSpan.style.color = '#4caf50';
+      } else {
+        userBadge.textContent = 'Unauthenticated';
+        userBadge.style.color = '#ffb74d';
+        promptSpan.textContent = `${getPromptText()} `;
+        promptSpan.style.color = '#ffb74d';
+      }
+    }
 
     function connect() {
       if (reconnectTimer) clearTimeout(reconnectTimer);
@@ -119,13 +172,22 @@
       socket.onopen = () => {
         statusEl.textContent = 'Connected';
         statusEl.className = 'status connected';
-        appendOutput('[Connected to MiniRedis server]\n', 'system');
       };
 
       socket.onmessage = (event) => {
         try {
           const msg = JSON.parse(event.data);
-          appendOutput(msg.data, msg.type);
+          if (msg.type === 'auth_success') {
+            currentUser = msg.user;
+            updateUIState();
+            appendOutput(msg.data, 'system');
+          } else if (msg.type === 'logout') {
+            currentUser = null;
+            updateUIState();
+            appendOutput(msg.data, 'system');
+          } else {
+            appendOutput(msg.data, msg.type);
+          }
         } catch (e) {
           appendOutput(event.data, 'output');
         }
@@ -134,7 +196,9 @@
       socket.onclose = () => {
         statusEl.textContent = 'Disconnected';
         statusEl.className = 'status disconnected';
-        appendOutput('\n[Connection closed. Reconnecting in 3s...]\n', 'system');
+        appendOutput('\n[Connection closed. Reconnecting in 3s...]\n', 'error');
+        currentUser = null;
+        updateUIState();
         reconnectTimer = setTimeout(connect, 3000);
       };
 
@@ -161,7 +225,8 @@
         return;
       }
 
-      appendOutput(`MiniRedis> ${cmd}\n`, 'cmd');
+      appendOutput(`${getPromptText()} ${cmd}\n`, 'cmd');
+
       if (socket && socket.readyState === WebSocket.OPEN) {
         socket.send(cmd);
       } else {
@@ -198,6 +263,7 @@
       input.focus();
     });
 
+    updateUIState();
     connect();
   </script>
 </body>
